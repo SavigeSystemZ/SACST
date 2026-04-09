@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
 INSTANCE="${1:-GhostZ}"
 
 echo "=== Sys-Agent Core Doctor: $INSTANCE ==="

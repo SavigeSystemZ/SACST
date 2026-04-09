@@ -1,0 +1,35 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Inventory State Schema"
+description: "Defines the remote devices and network infrastructure managed by Sys-Agent Core"
+type: object
+required: [devices]
+properties:
+  devices:
+    type: array
+    items:
+      type: object
+      required: [name, type, host]
+      properties:
+        name:
+          type: string
+          description: "Friendly name of the device"
+        type:
+          type: string
+          enum: [linux-server, opnsense-firewall, network-switch, other]
+          description: "The OS or platform type"
+        host:
+          type: string
+          description: "IP address or hostname"
+        port:
+          type: integer
+          default: 22
+          description: "SSH Port"
+        user:
+          type: string
+          description: "SSH Username"
+        ssh_key_path:
+          type: string
+          description: "Path to the SSH private key"
+        role:
+          type: string
+          description: "Primary role (e.g., edge-router, core-switch)"

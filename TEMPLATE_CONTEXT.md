@@ -1,7 +1,7 @@
 # Sys-Agent Core - Template Context
 
 ## Role and Identity
-This directory (`/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE`) is the master **Template and Meta-System** for the Sys-Agent Core.
+This directory (`$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE`) is the master **Template and Meta-System** for the Sys-Agent Core.
 
 **CRITICAL RULE:** This directory is strictly a template. It contains no computer-specific context, setup, or design files. It acts as the unmodifiable source of truth that defines how the system is built and how agents should behave.
 

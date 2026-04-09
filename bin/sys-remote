@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+INSTANCE="${1:-default}"
+DEVICE_NAME="${2:-}"
+COMMAND="${3:-}"
+
+if [ -z "$DEVICE_NAME" ] || [ -z "$COMMAND" ]; then
+    echo "Usage: sys-remote <instance> <device_name> \"<command>\""
+    echo "Executes a command on a remote device defined in the inventory via SSH."
+    exit 1
+fi
+
+INVENTORY_FILE="$ROOT/instances/$INSTANCE/inventory/hosts.yaml"
+if [ ! -f "$INVENTORY_FILE" ]; then
+    echo "Error: Inventory file not found at $INVENTORY_FILE"
+    exit 1
+fi
+
+# Basic extraction (ideally use yq, but using grep/awk for portability)
+HOST_LINE=$(grep -A 6 "- name: $DEVICE_NAME" "$INVENTORY_FILE" | grep "host:" | head -1 || true)
+USER_LINE=$(grep -A 6 "- name: $DEVICE_NAME" "$INVENTORY_FILE" | grep "user:" | head -1 || true)
+PORT_LINE=$(grep -A 6 "- name: $DEVICE_NAME" "$INVENTORY_FILE" | grep "port:" | head -1 || true)
+
+if [ -z "$HOST_LINE" ]; then
+    echo "Error: Device '$DEVICE_NAME' not found in $INVENTORY_FILE"
+    exit 1
+fi
+
+HOST=$(echo "$HOST_LINE" | awk '{print $2}')
+USER=$(echo "$USER_LINE" | awk '{print $2}')
+PORT=$(echo "$PORT_LINE" | awk '{print $2}')
+
+# Set defaults
+[ -z "$USER" ] && USER="$USER" || USER="${USER:-root}"
+[ -z "$PORT" ] && PORT="${PORT:-22}"
+
+echo "Executing on $DEVICE_NAME ($USER@$HOST:$PORT)..."
+ssh -q -o BatchMode=yes -o StrictHostKeyChecking=accept-new -p "$PORT" "${USER}@${HOST}" "$COMMAND"

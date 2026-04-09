@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
 INSTANCE="${1:-GhostZ}"
 HOST="$(hostname -s 2>/dev/null || hostname)"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -36,6 +36,7 @@ mkdir -p \
   "$STATE_DIR/diffs" \
   "$STATE_DIR/exports" \
   "$INST_DIR/prompts" \
+  "$INST_DIR/inventory" \
   "$INST_DIR/reports/latest" \
   "$INST_DIR/reports/history"
 
@@ -99,12 +100,37 @@ allow_boot_changes: false
 EOF
 fi
 
+if [ ! -f "$INST_DIR/inventory/hosts.yaml" ]; then
+cat > "$INST_DIR/inventory/hosts.yaml" <<'EOF'
+devices:
+  - name: local-workstation
+    type: linux-desktop
+    host: localhost
+  # Example Remote Server
+  # - name: core-server
+  #   type: linux-server
+  #   host: 192.168.1.10
+  #   user: root
+  #   port: 22
+  # Example Firewall
+  # - name: edge-fw
+  #   type: opnsense-firewall
+  #   host: 192.168.1.1
+  #   user: admin
+  # Example Switch
+  # - name: core-switch
+  #   type: network-switch
+  #   host: 192.168.1.2
+  #   user: admin
+EOF
+fi
+
 if [ ! -f "$RUNTIME_DIR/PERMISSIONS_EFFECTIVE.yaml" ]; then
 cat > "$RUNTIME_DIR/PERMISSIONS_EFFECTIVE.yaml" <<'EOF'
 read_scope:
   - /
 write_scope:
-  - /home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE
+  - $HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE
 command_scope:
   - inspect
   - audit
