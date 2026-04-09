@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+INSTANCE="${1:-GhostZ}"
+
+echo "=== Sys-Agent Core Fixer: $INSTANCE ==="
+echo "Attempting to fix framework and permission issues..."
+
+# 1. Fix script permissions
+echo "Ensuring scripts are executable..."
+chmod +x "$ROOT/framework/bin"/*
+
+# 2. Check for missing core directories
+mkdir -p \
+  "$ROOT/instances/$INSTANCE/state/checkpoints" \
+  "$ROOT/instances/$INSTANCE/logs" \
+  "$ROOT/instances/$INSTANCE/runtime"
+
+# 3. Re-initialize Git if missing
+if [ ! -d "$ROOT/.git" ]; then
+    echo "Initializing Git repository..."
+    git -C "$ROOT" init
+fi
+
+echo "Self-healing steps complete. Rerunning sys-doctor..."
+"$ROOT/framework/bin/sys-doctor" "$INSTANCE"

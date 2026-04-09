@@ -1,0 +1,6 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  read_scope: { type: array, items: { type: string } }
+  write_scope: { type: array, items: { type: string } }
+  prohibited_actions: { type: array, items: { type: string } }

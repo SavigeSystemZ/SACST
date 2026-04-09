@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+INSTANCE="${1:-GhostZ}"
+HOST="$(hostname -s 2>/dev/null || hostname)"
+TS="$(date -u +%Y%m%dT%H%M%SZ)"
+
+INST_DIR="$ROOT/instances/$INSTANCE"
+RAW_DIR="$INST_DIR/context/raw-audit/$TS"
+NORM_DIR="$INST_DIR/context/normalized"
+RUNTIME_DIR="$INST_DIR/runtime"
+LOG_DIR="$INST_DIR/logs"
+STATE_DIR="$INST_DIR/state"
+
+mkdir -p \
+  "$ROOT/framework/bin" \
+  "$ROOT/framework/canonical" \
+  "$ROOT/framework/schemas" \
+  "$ROOT/framework/templates/cursor" \
+  "$ROOT/framework/platforms/linux-desktop/commands" \
+  "$ROOT/framework/adapters" \
+  "$ROOT/framework/learning/candidates" \
+  "$ROOT/framework/learning/accepted" \
+  "$ROOT/framework/learning/rejected" \
+  "$ROOT/framework/learning/patterns" \
+  "$ROOT/framework/learning/sessions" \
+  "$RAW_DIR" \
+  "$NORM_DIR" \
+  "$RUNTIME_DIR" \
+  "$INST_DIR/control/.cursor/rules" \
+  "$INST_DIR/control/.github/instructions" \
+  "$LOG_DIR" \
+  "$STATE_DIR/backups" \
+  "$STATE_DIR/checkpoints" \
+  "$STATE_DIR/diffs" \
+  "$STATE_DIR/exports" \
+  "$INST_DIR/prompts" \
+  "$INST_DIR/reports/latest" \
+  "$INST_DIR/reports/history"
+
+run_capture() {
+  local outfile="$1"
+  shift
+  {
+    echo "# collected_at_utc=$TS"
+    echo "# host=$HOST"
+    echo "# command=$*"
+    echo
+    "$@" || true
+  } > "$RAW_DIR/$outfile"
+}
+
+run_capture "01_os_info.txt" bash -lc 'uname -a; echo; cat /etc/os-release'
+run_capture "02_hardware_info.txt" bash -lc 'lscpu; echo; free -h; echo; lsblk; echo; lspci'
+run_capture "03_installed_packages.txt" bash -lc 'dpkg-query -W -f='"'"'${binary:Package} ${Version}\n'"'"''
+run_capture "04_snap_flatpak_apps.txt" bash -lc 'snap list 2>/dev/null; echo; flatpak list 2>/dev/null'
+run_capture "05_home_dotfiles.txt" bash -lc 'ls -A1 "$HOME" | grep "^\." || true'
+run_capture "06_dev_tools_and_ai.txt" bash -lc '
+  echo "=== OLLAMA MODELS ==="; ollama list 2>/dev/null
+  echo; echo "=== DOCKER ==="; docker --version 2>/dev/null
+  echo; echo "=== KUBECTL ==="; kubectl version --client 2>/dev/null
+  echo; echo "=== NODE ==="; node --version 2>/dev/null
+  echo; echo "=== PYTHON ==="; python3 --version 2>/dev/null
+  echo; echo "=== GO ==="; go version 2>/dev/null
+  echo; echo "=== CARGO ==="; cargo --version 2>/dev/null
+'
+run_capture "07_running_services.txt" bash -lc 'systemctl list-units --type=service --state=running'
+run_capture "08_ports.txt" bash -lc 'ss -tulpn'
+run_capture "09_docker_runtime.txt" bash -lc 'docker ps -a 2>/dev/null; echo; docker network ls 2>/dev/null'
+run_capture "10_ollama_runtime.txt" bash -lc 'ollama ps 2>/dev/null; echo; ollama list 2>/dev/null'
+run_capture "11_gpu.txt" bash -lc 'nvidia-smi 2>/dev/null'
+run_capture "12_network.txt" bash -lc 'ip addr; echo; ip route; echo; resolvectl status 2>/dev/null || true'
+
+cat > "$RUNTIME_DIR/SYSTEM_STATE.yaml" <<EOF
+instance: "$INSTANCE"
+host: "$HOST"
+root: "$ROOT"
+platform_class: "linux-desktop"
+collected_at_utc: "$TS"
+latest_raw_audit_dir: "$RAW_DIR"
+normalized_context_dir: "$NORM_DIR"
+mode_file: "$RUNTIME_DIR/MODE_STATE.yaml"
+mission_file: "$RUNTIME_DIR/CURRENT_MISSION.md"
+plan_file: "$RUNTIME_DIR/CURRENT_PLAN.md"
+permissions_file: "$RUNTIME_DIR/PERMISSIONS_EFFECTIVE.yaml"
+EOF
+
+if [ ! -f "$RUNTIME_DIR/MODE_STATE.yaml" ]; then
+cat > "$RUNTIME_DIR/MODE_STATE.yaml" <<'EOF'
+mode: advisor
+requires_confirmation_for_critical: true
+auto_log_actions: true
+auto_snapshot_touched_files: true
+allow_package_changes: false
+allow_service_changes: false
+allow_network_changes: false
+allow_boot_changes: false
+EOF
+fi
+
+if [ ! -f "$RUNTIME_DIR/PERMISSIONS_EFFECTIVE.yaml" ]; then
+cat > "$RUNTIME_DIR/PERMISSIONS_EFFECTIVE.yaml" <<'EOF'
+read_scope:
+  - /
+write_scope:
+  - /home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE
+command_scope:
+  - inspect
+  - audit
+  - report
+prohibited_actions:
+  - partition_without_explicit_task
+  - cryptsetup_change_without_explicit_task
+  - firewall_change_without_explicit_task
+critical_action_classes:
+  - bootloader
+  - initramfs
+  - kernel
+  - disk
+  - crypto
+  - firewall
+  - network
+  - pam
+  - ssh_auth
+  - gpu_driver
+  - core_service
+repo_precedence_required: true
+EOF
+fi
+
+: > "$LOG_DIR/actions.jsonl"
+: > "$LOG_DIR/critical-actions.jsonl"
+: > "$LOG_DIR/sessions.jsonl"
+: > "$LOG_DIR/feedback.jsonl"
+: > "$LOG_DIR/learn-events.jsonl"
+
+echo "# Current mission" > "$RUNTIME_DIR/CURRENT_MISSION.md"
+echo "# Current plan" > "$RUNTIME_DIR/CURRENT_PLAN.md"
+echo "# Next actions" > "$RUNTIME_DIR/NEXT_ACTIONS.md"
+echo "Last refresh: $TS" > "$RUNTIME_DIR/LAST_REFRESH.md"
+
+if [ ! -d "$ROOT/.git" ]; then
+  git -C "$ROOT" init >/dev/null 2>&1 || true
+fi
+
+echo "Sys-Agent Core initialized for instance: $INSTANCE"
+echo "Raw audit captured at: $RAW_DIR"
+echo "Next step: normalize raw audit into context/normalized and generate control adapter files."

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+INSTANCE="${1:-GhostZ}"
+
+echo "=== Sys-Agent Core Report for $INSTANCE ==="
+echo "Current Mode: $(grep '^mode:' "$ROOT/instances/$INSTANCE/runtime/MODE_STATE.yaml" | cut -d' ' -f2)"
+echo "Last Refresh: $(cat "$ROOT/instances/$INSTANCE/runtime/LAST_REFRESH.md")"
+echo
+echo "--- Recent Critical Actions ---"
+tail -n 5 "$ROOT/instances/$INSTANCE/logs/critical-actions.jsonl" 2>/dev/null || echo "No critical actions yet."
+echo
+echo "--- Pending Learning Candidates ---"
+ls "$ROOT/framework/learning/candidates/" | head -n 5
+echo
+echo "--- System Health ---"
+df -h / | tail -n 1
+uptime -p

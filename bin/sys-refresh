@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+INSTANCE="${1:-GhostZ}"
+
+echo "Refreshing Sys-Agent Core instance: $INSTANCE"
+"$ROOT/framework/bin/sys-init" "$INSTANCE"
+echo "Refresh complete."

@@ -1,0 +1,6 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+properties:
+  ts: { type: string }
+  session_id: { type: string }
+  user_signal: { type: string, enum: [liked, disliked, neutral] }

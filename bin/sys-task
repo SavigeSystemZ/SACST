@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+INSTANCE="${1:-GhostZ}"
+TYPE="${2}" # mission | plan
+MESSAGE="${3}"
+
+if [ "$TYPE" == "mission" ]; then
+    FILE="$ROOT/instances/$INSTANCE/runtime/CURRENT_MISSION.md"
+    echo "# Current Mission: $(date)" > "$FILE"
+    echo "$MESSAGE" >> "$FILE"
+    echo "Mission updated."
+elif [ "$TYPE" == "plan" ]; then
+    FILE="$ROOT/instances/$INSTANCE/runtime/CURRENT_PLAN.md"
+    echo "# Current Plan: $(date)" > "$FILE"
+    echo "$MESSAGE" >> "$FILE"
+    echo "Plan updated."
+else
+    echo "Usage: sys-task <instance> <mission|plan> <message>"
+    exit 1
+fi

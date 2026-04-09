@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+INSTANCE="${1:-GhostZ}"
+NEW_MODE="${2:-advisor}"
+
+MODE_FILE="$ROOT/instances/$INSTANCE/runtime/MODE_STATE.yaml"
+
+if [ ! -f "$MODE_FILE" ]; then
+    echo "Error: Mode file not found for instance $INSTANCE"
+    exit 1
+fi
+
+# Simple sed replacement for mode
+sed -i "s/^mode: .*/mode: $NEW_MODE/" "$MODE_FILE"
+
+echo "Instance $INSTANCE mode switched to: $NEW_MODE"

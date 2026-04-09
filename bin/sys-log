@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+INSTANCE="${1}"
+LOG_TYPE="${2:-action}" # action | critical | feedback
+MESSAGE="${3}"
+
+LOG_FILE="$ROOT/instances/$INSTANCE/logs/${LOG_TYPE}s.jsonl"
+
+if [ ! -d "$(dirname "$LOG_FILE")" ]; then
+    echo "Error: Log directory for instance $INSTANCE not found"
+    exit 1
+fi
+
+TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "{\"ts\": \"$TS\", \"msg\": \"$MESSAGE\"}" >> "$LOG_FILE"

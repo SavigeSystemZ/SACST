@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT="${SYS_AGENT_ROOT:-/home/whyte/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
+INSTANCE="${1:-GhostZ}"
+
+echo "=== Sys-Agent Core Doctor: $INSTANCE ==="
+echo "Checking Framework Integrity..."
+
+# 1. Check for canonical documents
+REQUIRED_DOCS=("PRD.md" "ARCHITECTURE.md" "DATA_MODEL.md" "SECURITY_BASELINE.md" "YOLO_PROTOCOL.md" "READ_BUNDLES.md" "AGENT_POLICY.md")
+for doc in "${REQUIRED_DOCS[@]}"; do
+    if [ ! -f "$ROOT/framework/canonical/$doc" ]; then
+        echo "FAIL: Missing canonical document: $doc"
+    else
+        echo "PASS: Canonical document $doc exists."
+    fi
+done
+
+# 2. Check for schemas
+if ls "$ROOT/framework/schemas"/*.yaml >/dev/null 2>&1; then
+    echo "PASS: Schemas found."
+else
+    echo "FAIL: No schemas found in framework/schemas/"
+fi
+
+# 3. Check for instance context
+if ls "$ROOT/instances/$INSTANCE/context/normalized"/*.md >/dev/null 2>&1; then
+    echo "PASS: Normalized context for $INSTANCE exists."
+else
+    echo "FAIL: Normalized context missing or empty for $INSTANCE."
+fi
+
+# 4. Check permissions
+for script in sys-init sys-refresh sys-mode sys-log sys-report; do
+    if [ ! -x "$ROOT/framework/bin/$script" ]; then
+        echo "FAIL: Script not executable: $script"
+    else
+        echo "PASS: Script $script is executable."
+    fi
+done
+
+# 5. Check Git repo
+if [ -d "$ROOT/.git" ]; then
+    echo "PASS: Git repository initialized."
+else
+    echo "FAIL: Git repository not found."
+fi
+
+echo "Doctor check complete."
