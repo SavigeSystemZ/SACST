@@ -1,14 +1,30 @@
-# Sys-Agent Core - Agent Policy
+# SACST Agent Policy
 
-## Default Operating Contract
-1. **Plan First:** Always formulate a brief plan before making changes.
-2. **Context is King:** Treat the normalized context (`HOST_PROFILE.md`, `NETWORK_TOPOLOGY.md`, etc.) as the current source of truth unless marked stale.
-3. **Refresh if Stale:** If facts are missing or outdated, trigger a `sys-refresh` or perform a targeted SSH audit.
-4. **Detect Precedence:** Do not assume repo-local rules are absent; detect them before touching target repositories.
-5. **Smallest Safe Change:** Prefer surgical edits over full-file rewrites. For network gear, apply incremental configuration changes rather than full config replacements.
-6. **Log Writes:** After any write action, update the session logs and runtime state.
+## Default Contract
 
-## Remote Execution & Network Policy
-1. **Anti-Lockout Rule:** When modifying firewall rules (OPNsense/Linux) or switch port configurations, always verify that the management SSH connection will not be dropped. Use `commit confirmed` or auto-revert scripts when available.
-2. **Secure Connections:** Always use SSH keys over passwords when available. Never log or output raw credentials in chat or unencrypted files.
-3. **Pre/Post Validation:** Before applying remote changes, take a backup of the current running config. After applying, verify connectivity and state.
+1. Plan before mutation.
+2. Use normalized context as source of truth unless stale.
+3. Refresh or explicitly acknowledge stale context before risky work.
+4. Detect repo-precedence before touching other repositories.
+5. Prefer incremental, reversible changes.
+6. Log mutations and critical reads.
+7. Re-check state after impactful actions; do not assume a stopped service, process, or temporary condition remains unchanged.
+8. Research unfamiliar, vendor-specific, or version-sensitive command syntax before execution and cite the source in project notes when it affects an operational command.
+9. Keep raw credentials and private configs out of prompts, search queries, logs, and template artifacts.
+10. For unmodeled vendors or devices, create a project-local platform plan before mutation.
+11. Require explicit confirmation for destructive, boot, disk, crypto, identity, firmware, or factory-reset work even in YOLO mode.
+
+## System-Operations Focus
+
+- Optimize for sysadmin, network-admin, and infrastructure workflows.
+- Keep hardware, OS, service, network, and security context explicit.
+- Treat project repos as operational control planes, not software application repos.
+- Treat authorized security assessment as an explicitly scoped sysadmin/security workflow, not an open-ended offensive workflow.
+- Treat vendor default credentials as security findings, not reusable template knowledge or normal operating credentials.
+
+## Remote Rules
+
+- Inventory drives remote targeting.
+- Platform profiles define backup, validation, and rollback expectations.
+- Anti-lockout protections are mandatory for firewall, routing, and switch changes.
+- Long-running or multi-step operations require follow-up verification when state persistence matters.

@@ -1,0 +1,2 @@
+pass in quick on igc0 inet from 192.168.10.0/24 to any keep state
+block in log quick on igc1 from any to 192.168.10.0/24

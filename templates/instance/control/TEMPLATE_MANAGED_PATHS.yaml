@@ -1,0 +1,24 @@
+schema_version: 1
+managed_paths:
+  - path: .gitignore
+    mode: merge-lines
+  - path: LOCAL_CONTEXT.md
+    mode: render-replace
+  - path: control/PROJECT_PROFILE.yaml
+    mode: render-replace
+  - path: control/MODE_POLICY.yaml
+    mode: replace
+  - path: control/PERMISSIONS_POLICY.yaml
+    mode: replace
+  - path: control/FRESHNESS_POLICY.yaml
+    mode: replace
+  - path: control/OPERATING_PROFILE.md
+    mode: replace
+  - path: control/SYSTEM_MAP.md
+    mode: render-replace
+  - path: control/TEMPLATE_MANAGED_PATHS.yaml
+    mode: replace
+  - path: .github/instructions/project.instructions.md
+    mode: replace
+  - path: .cursor/rules/00-project-scope.mdc
+    mode: replace

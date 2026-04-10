@@ -1,0 +1,13 @@
+# collected_at_utc=20240101T000000Z
+# host=minimal-host
+# command=lscpu; free -h; lsblk
+
+Architecture:                         x86_64
+CPU(s):                               8
+Model name:                           Example CPU
+
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       2.0Gi       9.0Gi       256Mi       4.0Gi        12Gi
+
+NAME   SIZE TYPE MOUNTPOINTS
+nvme0n1 1T  disk /

@@ -1,0 +1,35 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Runtime State"
+type: object
+required:
+  - schema_version
+  - instance_id
+  - project_root
+  - template_version
+  - mode
+  - last_refresh_utc
+  - freshness_status
+properties:
+  schema_version:
+    type: integer
+    const: 1
+  instance_id:
+    type: string
+  project_root:
+    type: string
+  template_version:
+    type: string
+  mode:
+    type: string
+    enum: [advisor, operator, yolo]
+  last_refresh_utc:
+    type: string
+  latest_raw_audit_dir:
+    type: string
+  normalization_manifest:
+    type: string
+  freshness_status:
+    type: string
+    enum: [fresh, stale, unknown]
+  normalized_context_dir:
+    type: string

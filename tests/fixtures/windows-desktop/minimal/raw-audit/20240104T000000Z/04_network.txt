@@ -1,0 +1,12 @@
+# collected_at_utc=2024-01-04T00:00:00Z
+# host=windows-fixture
+# transport=fixture
+
+InterfaceAlias       : Ethernet
+IPv4Address          : 192.0.2.10
+IPv4DefaultGateway   : 192.0.2.1
+DNSServer            : 192.0.2.53
+
+DestinationPrefix NextHop   RouteMetric InterfaceAlias
+----------------- -------   ----------- --------------
+0.0.0.0/0         192.0.2.1 25          Ethernet

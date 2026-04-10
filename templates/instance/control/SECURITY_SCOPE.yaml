@@ -1,0 +1,19 @@
+schema_version: 1
+authorized_security_testing: false
+default_posture: defensive-only
+allowed_activities:
+  - inventory
+  - exposure_review
+  - configuration_review
+  - patch_verification
+  - hardening
+prohibited_activities:
+  - exploit_validation_without_rules_of_engagement
+  - password_auditing_without_rules_of_engagement
+  - denial_of_service
+  - social_engineering
+  - destructive_testing
+rules_of_engagement_ref: ""
+approval_ref: ""
+evidence_handling: redact-sensitive-data
+notes: "Project-specific authorization and rules of engagement belong here, not in SACST."

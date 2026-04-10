@@ -1,0 +1,14 @@
+schema_version: 1
+layers:
+  - name: target_repo_local
+    description: Target repository local instructions and nested instruction files.
+  - name: project_repo_local
+    description: Project copy root adapters and project-local support files.
+  - name: sacst_generated_adapters
+    description: Generated SACST adapter surfaces for the project.
+  - name: sacst_canonical_policy
+    description: Canonical policy and architecture from SACST root.
+  - name: project_normalized_truth
+    description: Normalized infrastructure truth inside the project copy.
+  - name: runtime_state
+    description: Session and runtime state used for freshness and execution context.

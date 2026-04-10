@@ -1,0 +1,18 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Freshness Policy"
+type: object
+required:
+  - schema_version
+  - normalized_context_ttl_hours
+  - security_context_ttl_hours
+  - require_refresh_for_critical_when_stale
+properties:
+  schema_version:
+    type: integer
+    const: 1
+  normalized_context_ttl_hours:
+    type: integer
+  security_context_ttl_hours:
+    type: integer
+  require_refresh_for_critical_when_stale:
+    type: boolean

@@ -1,0 +1,64 @@
+schema_version: 1
+transport_modes:
+  - local
+  - ssh
+captures:
+  - outfile: 01_os_info.txt
+    command: |
+      echo '# host=profile-node'
+      echo
+      echo 'Linux profile-node 6.8.0-profile x86_64 GNU/Linux'
+      echo
+      echo 'NAME="ProfileOS"'
+      echo 'VERSION="1.0"'
+  - outfile: 02_hardware_info.txt
+    command: |
+      echo 'Architecture: x86_64'
+      echo 'CPU(s): 2'
+      echo 'Model name: Profile CPU'
+      echo
+      echo '               total        used        free      shared  buff/cache   available'
+      echo 'Mem:           4Gi        1.0Gi       2.0Gi       0Gi         1.0Gi       3Gi'
+      echo
+      echo 'NAME   SIZE TYPE MOUNTPOINTS'
+      echo 'sda    64G  disk /'
+  - outfile: 03_installed_packages.txt
+    command: echo 'profile-agent 1.0.0'
+  - outfile: 04_snap_flatpak_apps.txt
+    command: 'true'
+  - outfile: 05_home_dotfiles.txt
+    command: echo '.profile-tool'
+  - outfile: 06_dev_tools_and_ai.txt
+    command: |
+      echo '=== OLLAMA MODELS ==='
+      echo
+      echo '=== DOCKER ==='
+      echo 'Docker version profile'
+      echo
+      echo '=== KUBECTL ==='
+      echo
+      echo '=== NODE ==='
+      echo 'v20.0.0'
+      echo
+      echo '=== PYTHON ==='
+      echo 'Python 3.11.0'
+      echo
+      echo '=== GO ==='
+      echo
+      echo '=== CARGO ==='
+  - outfile: 07_running_services.txt
+    command: echo 'profile-service.service loaded active running'
+  - outfile: 08_ports.txt
+    command: echo 'tcp LISTEN 0 128 127.0.0.1:22 0.0.0.0:*'
+  - outfile: 09_docker_runtime.txt
+    command: 'true'
+  - outfile: 10_ollama_runtime.txt
+    command: 'true'
+  - outfile: 11_gpu.txt
+    command: 'true'
+  - outfile: 12_network.txt
+    command: |
+      echo '1: lo: <LOOPBACK>'
+      echo '2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP>'
+      echo
+      echo 'default via 10.0.0.1 dev eth0'

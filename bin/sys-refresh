@@ -1,9 +1,182 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
-INSTANCE="${1:-GhostZ}"
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
 
-echo "Refreshing Sys-Agent Core instance: $INSTANCE"
-"$ROOT/framework/bin/sys-init" "$INSTANCE"
-echo "Refresh complete."
+usage() {
+  cat <<'EOF'
+Usage: sys-refresh <project-path|instance-name> [--source <raw-audit-dir>] [--device <device-name>] [--output-scope <primary|device|both>] [--report]
+EOF
+}
+
+[ $# -ge 1 ] || { usage; exit 1; }
+
+PROJECT_ROOT=""
+SOURCE_DIR=""
+DEVICE_NAME=""
+OUTPUT_SCOPE=""
+WRITE_REPORT="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --source)
+      SOURCE_DIR="$(realpath_safe "$2")"
+      shift 2
+      ;;
+    --device)
+      DEVICE_NAME="$2"
+      shift 2
+      ;;
+    --output-scope)
+      OUTPUT_SCOPE="$2"
+      shift 2
+      ;;
+    --report)
+      WRITE_REPORT="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      if [ -z "$PROJECT_ROOT" ]; then
+        PROJECT_ROOT="$(resolve_project_arg "$1")"
+        shift
+      else
+        die "unexpected argument: $1"
+      fi
+      ;;
+  esac
+done
+
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+INSTANCE_ID="$(project_instance "$PROJECT_ROOT")"
+PROJECT_PLATFORM="$(project_platform "$PROJECT_ROOT")"
+COLLECTED_AT="$(timestamp_utc)"
+RAW_STAMP="$(timestamp_compact)"
+TARGET_PLATFORM="$PROJECT_PLATFORM"
+RAW_DIR="$PROJECT_ROOT/raw-audit/$RAW_STAMP"
+PRIMARY_OUTPUT_DIR="$PROJECT_ROOT/context/normalized"
+DEVICE_OUTPUT_DIR=""
+REPORT_FILE=""
+
+HOST_LABEL="$(hostname -s 2>/dev/null || hostname)"
+TRANSPORT="local"
+HOST="localhost"
+USER_NAME="${USER:-root}"
+PORT="22"
+BASTION=""
+COMMAND_TIMEOUT=""
+COLLECTOR_PROFILE=""
+
+normalize_into() {
+  local output_dir="$1"
+  local device_name="${2:-}"
+  local normalize_args=(
+    "$PROJECT_ROOT"
+    --source "$RAW_DIR"
+    --output-dir "$output_dir"
+    --platform "$TARGET_PLATFORM"
+  )
+  if [ -n "$device_name" ]; then
+    normalize_args+=( --device-name "$device_name" )
+  fi
+  "$SYS_AGENT_ROOT/bin/sys-normalize" "${normalize_args[@]}"
+}
+
+if [ -n "$DEVICE_NAME" ]; then
+  TARGET_PLATFORM="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" platform_family)"
+  HOST="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" host)"
+  TRANSPORT="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" transport)"
+  USER_NAME="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" user)"
+  PORT="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" port)"
+  BASTION="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" bastion)"
+  COMMAND_TIMEOUT="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" command_timeout_seconds)"
+  COLLECTOR_PROFILE="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" collector_profile)"
+
+  [ -n "$HOST" ] || die "device not found in inventory: $DEVICE_NAME"
+  [ -n "$TARGET_PLATFORM" ] || TARGET_PLATFORM="$PROJECT_PLATFORM"
+  [ -n "$TRANSPORT" ] || TRANSPORT="ssh"
+  [ -n "$USER_NAME" ] || USER_NAME="${USER:-root}"
+  [ -n "$PORT" ] || PORT="22"
+  [ -n "$OUTPUT_SCOPE" ] || OUTPUT_SCOPE="device"
+
+  RAW_DIR="$PROJECT_ROOT/raw-audit/devices/$DEVICE_NAME/$RAW_STAMP"
+  DEVICE_OUTPUT_DIR="$PROJECT_ROOT/context/normalized/devices/$DEVICE_NAME"
+  HOST_LABEL="$DEVICE_NAME"
+else
+  [ -n "$OUTPUT_SCOPE" ] || OUTPUT_SCOPE="primary"
+fi
+
+case "$OUTPUT_SCOPE" in
+  primary|device|both) ;;
+  *) die "output scope must be primary, device, or both" ;;
+esac
+
+if [ -n "$SOURCE_DIR" ]; then
+  mkdir -p "$RAW_DIR"
+  cp -R "$SOURCE_DIR"/. "$RAW_DIR"/
+else
+  MANIFEST="$(platform_collect_manifest_file "$TARGET_PLATFORM" "$COLLECTOR_PROFILE" || true)"
+  [ -n "$MANIFEST" ] || die "collect manifest not found for platform: $TARGET_PLATFORM"
+  capture_manifest_to_dir "$MANIFEST" "$RAW_DIR" "$COLLECTED_AT" "$HOST_LABEL" "$TRANSPORT" "$HOST" "$USER_NAME" "$PORT" "$BASTION" "$COMMAND_TIMEOUT"
+fi
+
+if [ -z "$DEVICE_NAME" ]; then
+  normalize_into "$PRIMARY_OUTPUT_DIR"
+else
+  case "$OUTPUT_SCOPE" in
+    device)
+      normalize_into "$DEVICE_OUTPUT_DIR" "$DEVICE_NAME"
+      ;;
+    primary)
+      normalize_into "$PRIMARY_OUTPUT_DIR" "$DEVICE_NAME"
+      ;;
+    both)
+      normalize_into "$DEVICE_OUTPUT_DIR" "$DEVICE_NAME"
+      normalize_into "$PRIMARY_OUTPUT_DIR" "$DEVICE_NAME"
+      ;;
+  esac
+  write_device_state "$PROJECT_ROOT" "$DEVICE_NAME" "$TARGET_PLATFORM" "$COLLECTED_AT" "$OUTPUT_SCOPE"
+fi
+
+"$SYS_AGENT_ROOT/bin/sys-generate-adapters" "$PROJECT_ROOT"
+
+if [ -z "$DEVICE_NAME" ] || [ "$OUTPUT_SCOPE" = "primary" ] || [ "$OUTPUT_SCOPE" = "both" ]; then
+  TTL="$(freshness_ttl_hours "$PROJECT_ROOT")"
+  FRESHNESS="$(freshness_status_from_last_refresh "$COLLECTED_AT" "$TTL")"
+  write_runtime_state "$PROJECT_ROOT" "$COLLECTED_AT" "$RAW_DIR" "$PRIMARY_OUTPUT_DIR/NORMALIZATION_MANIFEST.yaml" "$FRESHNESS"
+fi
+
+if [ "$WRITE_REPORT" = "true" ]; then
+  REPORT_FILE="$PROJECT_ROOT/reports/latest/REFRESH_REPORT_${RAW_STAMP}.md"
+  {
+    echo "# Refresh Report"
+    echo
+    echo "- generated_at_utc: $COLLECTED_AT"
+    echo "- instance_id: $INSTANCE_ID"
+    echo "- project_root: $PROJECT_ROOT"
+    echo "- source_raw_audit_dir: $RAW_DIR"
+    echo "- target_platform: $TARGET_PLATFORM"
+    echo "- output_scope: $OUTPUT_SCOPE"
+    if [ -n "$DEVICE_NAME" ]; then
+      echo "- device_name: $DEVICE_NAME"
+      echo "- transport: $TRANSPORT"
+      echo "- host: $HOST"
+    fi
+  } > "$REPORT_FILE"
+fi
+
+echo "Refreshed project repo: $PROJECT_ROOT"
+echo "Source raw audit: $RAW_DIR"
+echo "Instance: $INSTANCE_ID"
+if [ -n "$DEVICE_NAME" ]; then
+  echo "Device: $DEVICE_NAME"
+  echo "Platform: $TARGET_PLATFORM"
+  echo "Output scope: $OUTPUT_SCOPE"
+fi
+if [ "$WRITE_REPORT" = "true" ]; then
+  echo "Report written to $REPORT_FILE"
+fi

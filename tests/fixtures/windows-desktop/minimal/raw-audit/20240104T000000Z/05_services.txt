@@ -1,0 +1,9 @@
+# collected_at_utc=2024-01-04T00:00:00Z
+# host=windows-fixture
+# transport=fixture
+
+ Status Name        DisplayName
+ ------ ----        -----------
+Running EventLog    Windows Event Log
+Running sshd        OpenSSH SSH Server
+Stopped Spooler     Print Spooler

@@ -1,0 +1,21 @@
+schema_version: 1
+platform_family: windows-server
+captures:
+  - outfile: 01_system_info.txt
+    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ComputerInfo | Select-Object CsName,WindowsProductName,WindowsVersion,OsArchitecture | Format-List; $PSVersionTable.PSVersion"'
+  - outfile: 02_hardware_info.txt
+    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_ComputerSystem | Format-List Manufacturer,Model,TotalPhysicalMemory,Domain; Get-CimInstance Win32_Processor | Select-Object -First 1 Name,NumberOfCores,NumberOfLogicalProcessors | Format-List"'
+  - outfile: 03_installed_software.txt
+    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | Select-Object DisplayName,DisplayVersion,Publisher | Sort-Object DisplayName | Format-Table -AutoSize"'
+  - outfile: 04_network.txt
+    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetIPConfiguration; Get-NetRoute | Select-Object DestinationPrefix,NextHop,RouteMetric,InterfaceAlias | Sort-Object InterfaceAlias,DestinationPrefix | Format-Table -AutoSize"'
+  - outfile: 05_services.txt
+    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Service | Sort-Object Status,Name | Select-Object Status,Name,DisplayName | Format-Table -AutoSize"'
+  - outfile: 06_ports.txt
+    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress,LocalPort,OwningProcess | Sort-Object LocalPort | Format-Table -AutoSize"'
+  - outfile: 07_security.txt
+    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-MpComputerStatus -ErrorAction SilentlyContinue; Get-NetFirewallProfile | Format-List Name,Enabled,DefaultInboundAction,DefaultOutboundAction"'
+  - outfile: 08_updates.txt
+    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 50 | Format-Table -AutoSize"'
+  - outfile: 09_users.txt
+    command: 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-LocalUser -ErrorAction SilentlyContinue | Format-Table -AutoSize; Get-LocalGroup -ErrorAction SilentlyContinue | Format-Table -AutoSize"'

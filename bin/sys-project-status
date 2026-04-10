@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+[ $# -eq 1 ] || { echo "Usage: sys-project-status <project-path|instance-name>" >&2; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+INSTANCE_ID="$(project_instance "$PROJECT_ROOT")"
+MODE="$(current_mode "$PROJECT_ROOT")"
+PLATFORM="$(project_platform "$PROJECT_ROOT")"
+VERSION="$(yaml_scalar "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" template_version)"
+LAST_REFRESH="$(yaml_scalar "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" last_refresh_utc 2>/dev/null || true)"
+FRESHNESS="$(yaml_scalar "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" freshness_status 2>/dev/null || true)"
+GIT_BRANCH="$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+GIT_STATUS="$(git -C "$PROJECT_ROOT" status --short 2>/dev/null | wc -l | tr -d ' ')"
+DEVICE_STATE_COUNT="$({ find "$PROJECT_ROOT/runtime/devices" -name DEVICE_STATE.yaml -type f 2>/dev/null || true; } | wc -l | tr -d ' ')"
+DEVICE_BUNDLE_COUNT="$({ find "$PROJECT_ROOT/context/normalized/devices" -mindepth 1 -maxdepth 1 -type d 2>/dev/null || true; } | wc -l | tr -d ' ')"
+
+echo "=== SACST Project Status ==="
+echo "Instance: $INSTANCE_ID"
+echo "Path: $PROJECT_ROOT"
+echo "Platform: ${PLATFORM:-unknown}"
+echo "Template version: ${VERSION:-unknown}"
+echo "Mode: ${MODE:-unknown}"
+echo "Last refresh: ${LAST_REFRESH:-unknown}"
+echo "Freshness: ${FRESHNESS:-unknown}"
+echo "Git branch: ${GIT_BRANCH:-unknown}"
+echo "Git changed paths: ${GIT_STATUS:-0}"
+echo "Device states tracked: ${DEVICE_STATE_COUNT:-0}"
+echo "Device normalized bundles: ${DEVICE_BUNDLE_COUNT:-0}"

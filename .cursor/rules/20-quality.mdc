@@ -1,0 +1,8 @@
+---
+description: "SACST quality and integration rules"
+globs: ["**/*"]
+---
+
+- Prefer small coherent changes, but remove broken hierarchy assumptions rather than preserving them.
+- Update tests and validation whenever template behavior changes.
+- Keep tracked template artifacts separate from generated project artifacts.

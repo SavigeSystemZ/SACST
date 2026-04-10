@@ -1,32 +1,125 @@
-# Sys-Agent Core - Data Model
+# SACST Data Model
 
-## Core Entities
+## Template-Side Entities
 
-### HostInstance
-- `instance_id`: Unique identifier (e.g., GhostZ)
-- `host_name`: System hostname
-- `platform_class`: OS classification (e.g., linux-desktop)
-- `os_name`, `os_version`, `kernel`, `architecture`
-- `created_at`, `last_refresh_at`, `freshness_ttl_hours`
+### TemplateVersion
+- `template_id`
+- `template_version`
+- `compatibility_channel`
+- `updated_at_utc`
 
-### ModeState
-- `mode`: `advisor` | `operator` | `yolo`
-- `requires_confirmation_for_critical`: boolean
-- `auto_log_actions`: boolean
-- `auto_snapshot_touched_files`: boolean
-- *Action Allowances:* `allow_package_changes`, `allow_service_changes`, etc.
+### PrecedenceManifest
+- `layers[]`
+- `generator`
+- `generated_at_utc`
 
-### SessionLog
-- `session_id`, `started_at`, `ended_at`
-- `tool_name`, `operator_mode`, `task_summary`, `outcome`
+### LearningCandidate
+- `candidate_id`
+- `source_project`
+- `surface_area[]`
+- `summary`
+- `sanitized`
+- `validation_refs[]`
+
+## Project-Side Tracked Entities
+
+### ProjectProfile
+- `instance_id`
+- `project_root`
+- `primary_platform`
+- `template_version`
+- `created_at_utc`
+
+### ModePolicy
+- `default_mode`
+- `allowed_modes[]`
+- `requires_confirmation_for_critical`
+- `allow_package_changes`
+- `allow_service_changes`
+- `allow_network_changes`
+- `allow_boot_changes`
+
+### PermissionsPolicy
+- `read_scope[]`
+- `write_scope[]`
+- `command_scope[]`
+- `prohibited_actions[]`
+- `critical_action_classes[]`
+- `repo_precedence_required`
+
+### FreshnessPolicy
+- `normalized_context_ttl_hours`
+- `security_context_ttl_hours`
+- `require_refresh_for_critical_when_stale`
+
+### ResearchPolicy
+- `live_research_allowed`
+- `prefer_primary_sources`
+- `require_research_when[]`
+- `prohibited_query_content[]`
+- `notes_dir`
+
+### CredentialReferences
+- `secret_storage_policy`
+- `references[]`
+
+### SecurityScope
+- `authorized_security_testing`
+- `default_posture`
+- `allowed_activities[]`
+- `prohibited_activities[]`
+- `rules_of_engagement_ref`
+- `approval_ref`
+- `evidence_handling`
+
+### Inventory
+- `devices[]`
+- `network_zones[]`
+- `maintenance_windows[]`
+
+## Project-Side Generated Entities
+
+### RuntimeState
+- `instance_id`
+- `project_root`
+- `template_version`
+- `mode`
+- `latest_raw_audit_dir`
+- `last_refresh_utc`
+- `freshness_status`
+- `normalization_manifest`
+
+### DeviceState
+- `device_name`
+- `platform_family`
+- `collection_scope`
+- `last_collected_at_utc`
+- `last_validated_at_utc`
+
+### DeviceNormalizedBundle
+- `device_name`
+- `platform_family`
+- `output_dir`
+- `freshness_state`
+- `normalization_manifest`
 
 ### ActionLog
-- `ts`, `session_id`, `actor`, `mode`, `action_class`
-- `command`, `target_paths`, `before_refs`, `after_refs`, `rollback_refs`
+- `ts`
+- `session_id`
+- `actor`
+- `mode`
+- `action_class`
+- `targets[]`
+- `command_summary`
+- `before_refs[]`
+- `after_refs[]`
+- `rollback_refs[]`
+- `status`
 
-### EffectivePermissions
-- `read_scope`, `write_scope`, `command_scope`
-- `prohibited_actions`, `critical_action_classes`, `repo_precedence_required`
-
-### FeedbackEvent & LearningCandidate
-Used for the self-improvement loop, tracking user signals and proposed template changes.
+### SessionLog
+- `session_id`
+- `tool_name`
+- `started_at`
+- `ended_at`
+- `task_summary`
+- `outcome`

@@ -1,0 +1,18 @@
+schema_version: 1
+devices:
+  - name: {{INSTANCE_NAME}}-primary
+    platform_family: {{PRIMARY_PLATFORM}}
+    role: primary-managed-node
+    host: localhost
+    transport: local
+    auth_ref: local-shell
+    validation_profile: {{PRIMARY_PLATFORM}}
+    backup_profile: local-files
+    collector_profile: baseline
+    rollback_capability: file-checkpoint
+    risk_class: managed-host
+    command_timeout_seconds: 120
+    recheck_count: 2
+    recheck_interval_seconds: 5
+    tags:
+      - primary

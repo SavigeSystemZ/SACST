@@ -1,0 +1,2 @@
+# Baseline Windows Server validation. Verify role-specific checks before critical changes.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "hostname; Get-Service EventLog | Select-Object Status,Name | Format-Table -AutoSize"

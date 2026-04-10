@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+[ $# -eq 1 ] || { echo "Usage: sys-import-candidate <candidate-file>" >&2; exit 1; }
+
+SOURCE_FILE="$(realpath_safe "$1")"
+[ -f "$SOURCE_FILE" ] || die "candidate file not found: $SOURCE_FILE"
+
+DEST_DIR="$SYS_AGENT_ROOT/learning/candidates"
+mkdir -p "$DEST_DIR"
+DEST_FILE="$DEST_DIR/$(basename "$SOURCE_FILE")"
+cp "$SOURCE_FILE" "$DEST_FILE"
+echo "$DEST_FILE"

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+[ $# -ge 2 ] || { echo "Usage: sys-checkpoint <project-path|instance-name> <file> [file ...]" >&2; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+shift
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+CHECKPOINT_ID="$(timestamp_compact)"
+CHECKPOINT_DIR="$PROJECT_ROOT/state/checkpoints/$CHECKPOINT_ID"
+MANIFEST="$PROJECT_ROOT/state/rollback/checkpoint-$CHECKPOINT_ID.yaml"
+
+mkdir -p "$CHECKPOINT_DIR" "$PROJECT_ROOT/state/rollback"
+
+{
+  echo "schema_version: 1"
+  echo "checkpoint_id: $CHECKPOINT_ID"
+  echo "created_at_utc: $(timestamp_utc)"
+  echo "targets:"
+} > "$MANIFEST"
+
+for input in "$@"; do
+  if [[ "$input" = /* ]]; then
+    SOURCE="$input"
+  else
+    SOURCE="$PROJECT_ROOT/$input"
+  fi
+  [ -f "$SOURCE" ] || die "file not found: $SOURCE"
+  RELATIVE="${SOURCE#$PROJECT_ROOT/}"
+  BACKUP="$CHECKPOINT_DIR/$RELATIVE"
+  mkdir -p "$(dirname "$BACKUP")"
+  cp "$SOURCE" "$BACKUP"
+  {
+    echo "  - source: $SOURCE"
+    echo "    backup: $BACKUP"
+  } >> "$MANIFEST"
+done
+
+echo "$MANIFEST"

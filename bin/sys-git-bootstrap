@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+[ $# -ge 1 ] || { echo "Usage: sys-git-bootstrap <project-path|instance-name> [--create-remote]" >&2; exit 1; }
+
+PROJECT_ROOT=""
+CREATE_REMOTE="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --create-remote)
+      CREATE_REMOTE="true"
+      shift
+      ;;
+    *)
+      if [ -z "$PROJECT_ROOT" ]; then
+        PROJECT_ROOT="$(resolve_project_arg "$1")"
+        shift
+      else
+        die "unexpected argument: $1"
+      fi
+      ;;
+  esac
+done
+
+[ -n "$PROJECT_ROOT" ] || die "project path is required"
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+REPO_NAME="$(basename "$PROJECT_ROOT")"
+ORG="$(git_default org)"
+HOST="$(git_default host)"
+PROTOCOL="$(git_default protocol)"
+DEFAULT_BRANCH="$(git_default default_branch)"
+VISIBILITY="$(git_default visibility)"
+USER_NAME="$(git_default user_name)"
+USER_EMAIL="$(git_default user_email)"
+
+case "$PROTOCOL" in
+  ssh) REMOTE_URL="git@${HOST}:${ORG}/${REPO_NAME}.git" ;;
+  *) die "unsupported git protocol: $PROTOCOL" ;;
+esac
+
+if [ ! -d "$PROJECT_ROOT/.git" ]; then
+  git -C "$PROJECT_ROOT" init -b "$DEFAULT_BRANCH" >/dev/null 2>&1 || {
+    git -C "$PROJECT_ROOT" init >/dev/null
+    git -C "$PROJECT_ROOT" branch -M "$DEFAULT_BRANCH" >/dev/null 2>&1 || true
+  }
+fi
+
+if [ -n "$USER_NAME" ]; then
+  git -C "$PROJECT_ROOT" config user.name "$USER_NAME"
+fi
+if [ -n "$USER_EMAIL" ]; then
+  git -C "$PROJECT_ROOT" config user.email "$USER_EMAIL"
+fi
+
+if git -C "$PROJECT_ROOT" remote get-url origin >/dev/null 2>&1; then
+  :
+else
+  git -C "$PROJECT_ROOT" remote add origin "$REMOTE_URL"
+fi
+
+if [ "$CREATE_REMOTE" = "true" ] && command -v gh >/dev/null 2>&1; then
+  if gh auth status >/dev/null 2>&1; then
+    if ! gh repo view "$ORG/$REPO_NAME" >/dev/null 2>&1; then
+      gh repo create "$ORG/$REPO_NAME" "--$VISIBILITY" --source "$PROJECT_ROOT" --remote origin >/dev/null 2>&1 || \
+        warn "failed to create remote repository via gh for $ORG/$REPO_NAME"
+    fi
+  else
+    warn "gh is installed but not authenticated; skipped remote creation"
+  fi
+fi
+
+echo "Git bootstrap complete for $PROJECT_ROOT"

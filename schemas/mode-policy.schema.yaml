@@ -1,0 +1,34 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Mode Policy"
+type: object
+required:
+  - schema_version
+  - default_mode
+  - allowed_modes
+  - requires_confirmation_for_critical
+properties:
+  schema_version:
+    type: integer
+    const: 1
+  default_mode:
+    type: string
+    enum: [advisor, operator, yolo]
+  allowed_modes:
+    type: array
+    items:
+      type: string
+      enum: [advisor, operator, yolo]
+  requires_confirmation_for_critical:
+    type: boolean
+  auto_log_actions:
+    type: boolean
+  auto_snapshot_touched_files:
+    type: boolean
+  allow_package_changes:
+    type: boolean
+  allow_service_changes:
+    type: boolean
+  allow_network_changes:
+    type: boolean
+  allow_boot_changes:
+    type: boolean

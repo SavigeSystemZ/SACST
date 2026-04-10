@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: sys-project-update <project-path|instance-name> [--no-refresh] [--source <raw-audit-dir>] [--device <device-name>] [--output-scope <primary|device|both>]
+EOF
+}
+
+[ $# -ge 1 ] || { usage; exit 1; }
+
+PROJECT_ROOT=""
+NO_REFRESH="false"
+SOURCE_DIR=""
+DEVICE_NAME=""
+OUTPUT_SCOPE=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --no-refresh)
+      NO_REFRESH="true"
+      shift
+      ;;
+    --source)
+      SOURCE_DIR="$(realpath_safe "$2")"
+      shift 2
+      ;;
+    --device)
+      DEVICE_NAME="$2"
+      shift 2
+      ;;
+    --output-scope)
+      OUTPUT_SCOPE="$2"
+      shift 2
+      ;;
+    *)
+      if [ -z "$PROJECT_ROOT" ]; then
+        PROJECT_ROOT="$(resolve_project_arg "$1")"
+        shift
+      else
+        die "unexpected argument: $1"
+      fi
+      ;;
+  esac
+done
+
+[ -n "$PROJECT_ROOT" ] || die "project path is required"
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+"$SYS_AGENT_ROOT/bin/sys-sync-template" "$PROJECT_ROOT"
+
+if [ "$NO_REFRESH" != "true" ]; then
+  REFRESH_ARGS=( "$PROJECT_ROOT" )
+  [ -n "$SOURCE_DIR" ] && REFRESH_ARGS+=( --source "$SOURCE_DIR" )
+  [ -n "$DEVICE_NAME" ] && REFRESH_ARGS+=( --device "$DEVICE_NAME" )
+  [ -n "$OUTPUT_SCOPE" ] && REFRESH_ARGS+=( --output-scope "$OUTPUT_SCOPE" )
+  "$SYS_AGENT_ROOT/bin/sys-refresh" "${REFRESH_ARGS[@]}"
+fi
+
+"$SYS_AGENT_ROOT/bin/sys-validate" --project "$PROJECT_ROOT"

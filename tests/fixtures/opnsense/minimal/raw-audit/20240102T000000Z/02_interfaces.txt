@@ -1,0 +1,6 @@
+igc0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+        inet 192.168.10.1 netmask 0xffffff00 broadcast 192.168.10.255
+        description: LAN
+igc1: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+        inet 203.0.113.2 netmask 0xfffffffc broadcast 203.0.113.3
+        description: WAN

@@ -1,0 +1,24 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Normalization Manifest"
+type: object
+required:
+  - schema_version
+  - generated_at_utc
+  - source_raw_audit_dir
+  - outputs
+properties:
+  schema_version:
+    type: integer
+    const: 1
+  generated_at_utc:
+    type: string
+  source_raw_audit_dir:
+    type: string
+  platform_family:
+    type: string
+  target_device_name:
+    type: string
+  outputs:
+    type: array
+    items:
+      type: string

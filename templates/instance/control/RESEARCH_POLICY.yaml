@@ -1,0 +1,16 @@
+schema_version: 1
+live_research_allowed: true
+prefer_primary_sources: true
+require_research_when:
+  - vendor_cli_unknown
+  - command_syntax_version_sensitive
+  - windows_or_unmodeled_platform
+  - firewall_routing_auth_boot_storage_crypto_change
+  - user_requests_current_vendor_guidance
+prohibited_query_content:
+  - raw_credentials
+  - private_keys
+  - tokens
+  - private_config_full_text
+  - confidential_topology
+notes_dir: research/notes

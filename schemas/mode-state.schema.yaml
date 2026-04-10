@@ -1,8 +1,30 @@
 $schema: "http://json-schema.org/draft-07/schema#"
+title: "Mode State"
 type: object
+required:
+  - schema_version
+  - mode
+  - requires_confirmation_for_critical
+  - auto_log_actions
+  - auto_snapshot_touched_files
 properties:
+  schema_version:
+    type: integer
+    const: 1
   mode:
     type: string
     enum: [advisor, operator, yolo]
-  requires_confirmation_for_critical: { type: boolean }
-  auto_log_actions: { type: boolean }
+  requires_confirmation_for_critical:
+    type: boolean
+  auto_log_actions:
+    type: boolean
+  auto_snapshot_touched_files:
+    type: boolean
+  allow_package_changes:
+    type: boolean
+  allow_service_changes:
+    type: boolean
+  allow_network_changes:
+    type: boolean
+  allow_boot_changes:
+    type: boolean

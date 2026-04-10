@@ -1,0 +1,1 @@
+# Remote Linux changes should prefer file-level checkpoints or explicit device backup commands.

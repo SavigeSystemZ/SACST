@@ -1,0 +1,35 @@
+schema_version: 1
+transport_modes:
+  - local
+  - ssh
+captures:
+  - outfile: 01_os_info.txt
+    command: uname -a; echo; cat /etc/os-release 2>/dev/null || true
+  - outfile: 02_hardware_info.txt
+    command: lscpu 2>/dev/null; echo; free -h 2>/dev/null; echo; lsblk 2>/dev/null
+  - outfile: 03_installed_packages.txt
+    command: dpkg-query -W -f='${binary:Package} ${Version}\n' 2>/dev/null || rpm -qa 2>/dev/null || true
+  - outfile: 04_snap_flatpak_apps.txt
+    command: snap list 2>/dev/null; echo; flatpak list 2>/dev/null
+  - outfile: 05_home_dotfiles.txt
+    command: ls -A1 /root 2>/dev/null | grep '^\.' || true
+  - outfile: 06_dev_tools_and_ai.txt
+    command: |
+      echo "=== DOCKER ==="; docker --version 2>/dev/null
+      echo; echo "=== KUBECTL ==="; kubectl version --client 2>/dev/null
+      echo; echo "=== NODE ==="; node --version 2>/dev/null
+      echo; echo "=== PYTHON ==="; python3 --version 2>/dev/null
+      echo; echo "=== GO ==="; go version 2>/dev/null
+      echo; echo "=== CARGO ==="; cargo --version 2>/dev/null
+  - outfile: 07_running_services.txt
+    command: systemctl list-units --type=service --state=running 2>/dev/null || service -e 2>/dev/null || true
+  - outfile: 08_ports.txt
+    command: ss -tulpn 2>/dev/null || netstat -tulpn 2>/dev/null || true
+  - outfile: 09_docker_runtime.txt
+    command: docker ps -a 2>/dev/null; echo; docker network ls 2>/dev/null
+  - outfile: 10_ollama_runtime.txt
+    command: ollama ps 2>/dev/null; echo; ollama list 2>/dev/null
+  - outfile: 11_gpu.txt
+    command: nvidia-smi 2>/dev/null || true
+  - outfile: 12_network.txt
+    command: ip addr 2>/dev/null; echo; ip route 2>/dev/null; echo; resolvectl status 2>/dev/null || true

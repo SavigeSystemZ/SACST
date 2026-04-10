@@ -1,0 +1,8 @@
+---
+description: "SACST safety and mutation rules"
+globs: ["**/*"]
+---
+
+- Preserve sysadmin/network-admin safety requirements in canonical docs and command behavior.
+- Keep logging, checkpointing, rollback, and anti-lockout concepts concrete and consistent.
+- Never weaken secret-handling or repo-precedence safeguards.

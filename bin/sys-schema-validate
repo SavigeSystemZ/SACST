@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+[ $# -ge 2 ] || { echo "Usage: sys-schema-validate <schema> <file> [file ...]" >&2; exit 1; }
+
+SCHEMA="$1"
+shift
+SCHEMA_PATH="$SYS_AGENT_ROOT/schemas/$SCHEMA"
+[ -f "$SCHEMA_PATH" ] || die "schema not found: $SCHEMA_PATH"
+
+for target in "$@"; do
+  FILE_PATH="$target"
+  [ -f "$FILE_PATH" ] || die "file not found: $FILE_PATH"
+  schema_validate_path "$SCHEMA_PATH" "$FILE_PATH"
+  echo "PASS: $FILE_PATH matches $SCHEMA"
+done

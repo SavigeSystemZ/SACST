@@ -1,0 +1,8 @@
+---
+description: "SACST scope and boundary rules"
+globs: ["**/*"]
+---
+
+- SACST is the template and meta-system, not a live instance repo.
+- Never add live machine runtime, raw audit, logs, checkpoints, or instance state to SACST.
+- Keep project copies self-contained and external to SACST.

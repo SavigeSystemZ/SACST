@@ -1,0 +1,12 @@
+# collected_at_utc=2024-01-04T00:00:00Z
+# host=windows-fixture
+# transport=fixture
+
+AMServiceEnabled              : True
+AntivirusEnabled              : True
+RealTimeProtectionEnabled     : True
+
+Name                  : Domain
+Enabled               : True
+DefaultInboundAction  : Block
+DefaultOutboundAction : Allow

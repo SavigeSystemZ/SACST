@@ -1,13 +1,35 @@
-# Sys-Agent Core - Security Baseline
+# SACST Security Baseline
 
-## Rules of Engagement
-1. **No Silent Sudo:** Every command requiring `sudo` must be preceded by an explanation of why it is needed and what it will change.
-2. **Credential Protection:** Never log, print, or store secrets, API keys, or passwords. Any attempt to read `.env` files or `~/.ssh/` must be specifically justified.
-3. **Third-Party Verification:** Before running scripts downloaded from the web (e.g., `curl | bash`), you MUST inspect the source and explain its intent.
-4. **Minimal Privilege:** Always attempt a command without `sudo` first unless it is known to be a system-level operation.
-5. **No Blind Deletion:** Use `trash-cli` or similar where possible. If using `rm`, verify the target path is not a core system directory.
+## Core Rules
 
-## Critical Protections
-- **Boot/Crypto:** No changes to `/boot/` or `cryptsetup` without a pre-change snapshot and a specific mission plan.
-- **Firewall:** Any change to `ufw` or `iptables` must be validated with a port scan or connectivity check.
-- **Auth:** No changes to `/etc/pam.d/` or `sshd_config` without manual verification of alternative access (e.g., a secondary open terminal).
+1. Explain privileged intent before using `sudo`.
+2. Never log or persist raw secrets, credentials, or private keys.
+3. Prefer least privilege and the smallest safe change.
+4. Inspect downloaded scripts before execution.
+5. Treat firewall, auth, boot, crypto, disk, routing, and core-service work as critical actions.
+6. Treat security testing as defensive-only unless `control/SECURITY_SCOPE.yaml` explicitly authorizes the activity and names the rules of engagement.
+7. Store credential references only; keep raw credentials in external secret stores, SSH agents, password managers, or operator-held sessions.
+
+## Remote Safety
+
+- Preserve the management path before applying remote network or firewall changes.
+- Take a pre-change backup before remote config mutation.
+- Validate reachability and state after every remote change.
+- Record rollback manifests for remote mutations, including the rollback command or restore instructions when a device-specific rollback command is not available.
+
+## Research Safety
+
+- Use live research when command syntax is unfamiliar, vendor-specific, or version-sensitive.
+- Do not paste private configs, secrets, token values, or confidential topology into research queries.
+- Convert researched commands into preflighted project actions with validation and rollback notes before execution.
+
+## Destructive Action Safety
+
+- Destructive deletion, disk, boot, crypto, identity, firmware, and factory-reset actions require explicit confirmation even in YOLO mode.
+- Unmodeled vendor devices require a project-local platform plan before mutation.
+- Unknown rollback paths block critical remote changes unless the operator explicitly provides a rollback reference and accepts the risk.
+
+## Repo Pivot Safety
+
+- When entering another repository, detect its local instruction files before editing.
+- SACST guidance governs machine operations and orchestration, not target-repo implementation preferences.

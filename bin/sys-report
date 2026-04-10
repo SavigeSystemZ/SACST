@@ -1,19 +1,38 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
-INSTANCE="${1:-GhostZ}"
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
 
-echo "=== Sys-Agent Core Report for $INSTANCE ==="
-echo "Current Mode: $(grep '^mode:' "$ROOT/instances/$INSTANCE/runtime/MODE_STATE.yaml" | cut -d' ' -f2)"
-echo "Last Refresh: $(cat "$ROOT/instances/$INSTANCE/runtime/LAST_REFRESH.md")"
+[ $# -eq 1 ] || { echo "Usage: sys-report <project-path|instance-name>" >&2; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+INSTANCE_ID="$(project_instance "$PROJECT_ROOT")"
+MODE="$(current_mode "$PROJECT_ROOT")"
+LAST_REFRESH="$(yaml_scalar "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" last_refresh_utc 2>/dev/null || true)"
+FRESHNESS="$(yaml_scalar "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" freshness_status 2>/dev/null || true)"
+
+echo "=== SACST Project Report ==="
+echo "Project: $INSTANCE_ID"
+echo "Path: $PROJECT_ROOT"
+echo "Mode: ${MODE:-unknown}"
+echo "Last refresh: ${LAST_REFRESH:-unknown}"
+echo "Freshness: ${FRESHNESS:-unknown}"
 echo
 echo "--- Recent Critical Actions ---"
-tail -n 5 "$ROOT/instances/$INSTANCE/logs/critical-actions.jsonl" 2>/dev/null || echo "No critical actions yet."
+tail -n 5 "$PROJECT_ROOT/logs/critical-actions.jsonl" 2>/dev/null || echo "No critical actions yet."
 echo
-echo "--- Pending Learning Candidates ---"
-ls "$ROOT/framework/learning/candidates/" | head -n 5
+echo "--- Inventory ---"
+sed -n '1,80p' "$PROJECT_ROOT/inventory/devices.yaml"
 echo
-echo "--- System Health ---"
-df -h / | tail -n 1
-uptime -p
+echo "--- Device States ---"
+if { find "$PROJECT_ROOT/runtime/devices" -name DEVICE_STATE.yaml -type f 2>/dev/null || true; } | grep -q .; then
+  { find "$PROJECT_ROOT/runtime/devices" -name DEVICE_STATE.yaml -type f 2>/dev/null || true; } | sort | while read -r state_file; do
+    echo "[$state_file]"
+    sed -n '1,80p' "$state_file"
+    echo
+  done
+else
+  echo "No device state records yet."
+fi

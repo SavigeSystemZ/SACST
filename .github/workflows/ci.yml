@@ -1,0 +1,62 @@
+name: sacst-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml jsonschema
+
+      - name: Shell syntax
+        run: |
+          for f in bin/* tests/integration/*.sh; do
+            bash -n "$f"
+          done
+
+      - name: Validate template
+        run: |
+          ./bin/sys-validate --template
+          ./bin/sys-meta-check
+
+      - name: Integration tests
+        run: |
+          ./tests/integration/test_scaffold.sh
+          ./tests/integration/test_normalize.sh
+          ./tests/integration/test_normalize_windows.sh
+          ./tests/integration/test_generic_vendor.sh
+          ./tests/integration/test_normalize_opnsense.sh
+          ./tests/integration/test_normalize_switch.sh
+          ./tests/integration/test_refresh_device_opnsense.sh
+          ./tests/integration/test_refresh_device_both.sh
+          ./tests/integration/test_refresh_device_profile.sh
+          ./tests/integration/test_adopt_existing.sh
+          ./tests/integration/test_reconcile_project.sh
+          ./tests/integration/test_meta_check.sh
+          ./tests/integration/test_sys_fix_project.sh
+          ./tests/integration/test_sys_fix_template.sh
+          ./tests/integration/test_git_bootstrap.sh
+          ./tests/integration/test_log_validation.sh
+          ./tests/integration/test_stale_preflight.sh
+          ./tests/integration/test_sync_dry_run.sh
+          ./tests/integration/test_sync_preserves_context.sh
+          ./tests/integration/test_remote_dry_run.sh
+          ./tests/integration/test_remote_profile_dry_run.sh
+          ./tests/integration/test_remote_rollback_manifest.sh
+          ./tests/integration/test_security_scope.sh
+          ./tests/integration/test_research_plan.sh
+          ./tests/integration/test_platform_plan.sh
+          ./tests/integration/test_destructive_preflight.sh
+          ./tests/integration/test_learning_flow.sh

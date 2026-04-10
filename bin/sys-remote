@@ -1,40 +1,282 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
-INSTANCE="${1:-default}"
-DEVICE_NAME="${2:-}"
-COMMAND="${3:-}"
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
 
-if [ -z "$DEVICE_NAME" ] || [ -z "$COMMAND" ]; then
-    echo "Usage: sys-remote <instance> <device_name> \"<command>\""
-    echo "Executes a command on a remote device defined in the inventory via SSH."
-    exit 1
+usage() {
+  cat <<'EOF'
+Usage: sys-remote <project-path|instance-name> <device-name> <command> [--action-class <class>] [--activity <activity>] [--confirmed] [--dry-run] [--with-backup] [--with-validate] [--report] [--recheck-count <n>] [--recheck-interval <seconds>] [--rollback-command <command>]
+EOF
+}
+
+[ $# -ge 3 ] || { usage; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+DEVICE_NAME="$2"
+shift 2
+
+ACTION_CLASS="inspect"
+ACTIVITY=""
+CONFIRMED="false"
+DRY_RUN="false"
+WITH_BACKUP="false"
+WITH_VALIDATE="false"
+WRITE_REPORT="false"
+RECHECK_COUNT=""
+RECHECK_INTERVAL=""
+ROLLBACK_COMMAND=""
+POSITIONAL=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --action-class)
+      ACTION_CLASS="$2"
+      shift 2
+      ;;
+    --activity)
+      ACTIVITY="$2"
+      shift 2
+      ;;
+    --confirmed)
+      CONFIRMED="true"
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    --with-backup)
+      WITH_BACKUP="true"
+      shift
+      ;;
+    --with-validate)
+      WITH_VALIDATE="true"
+      shift
+      ;;
+    --report)
+      WRITE_REPORT="true"
+      shift
+      ;;
+    --recheck-count)
+      RECHECK_COUNT="$2"
+      shift 2
+      ;;
+    --recheck-interval)
+      RECHECK_INTERVAL="$2"
+      shift 2
+      ;;
+    --rollback-command)
+      ROLLBACK_COMMAND="$2"
+      shift 2
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+      ;;
+  esac
+done
+
+COMMAND_STRING="${POSITIONAL[*]}"
+[ -n "$COMMAND_STRING" ] || die "command is required"
+[ -n "$ACTIVITY" ] || ACTIVITY="$ACTION_CLASS"
+
+INVENTORY_FILE="$(project_inventory_file "$PROJECT_ROOT")"
+[ -f "$INVENTORY_FILE" ] || die "inventory file not found: $INVENTORY_FILE"
+
+HOST="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" host)"
+TRANSPORT="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" transport)"
+USER_NAME="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" user)"
+PORT="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" port)"
+PLATFORM="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" platform_family)"
+BASTION="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" bastion)"
+VALIDATION_PROFILE="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" validation_profile)"
+BACKUP_PROFILE="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" backup_profile)"
+BACKUP_COMMAND="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" backup_command)"
+VALIDATE_COMMAND="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" validate_command)"
+MANAGEMENT_PROBE="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" management_probe)"
+COMMAND_TIMEOUT="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" command_timeout_seconds)"
+DEVICE_RECHECK_COUNT="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" recheck_count)"
+DEVICE_RECHECK_INTERVAL="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" recheck_interval_seconds)"
+
+[ -n "$HOST" ] || die "device not found in inventory: $DEVICE_NAME"
+[ -n "$TRANSPORT" ] || TRANSPORT="ssh"
+[ -n "$USER_NAME" ] || USER_NAME="${USER:-root}"
+[ -n "$PORT" ] || PORT="22"
+[ -n "$BACKUP_COMMAND" ] || BACKUP_COMMAND="$(platform_default_command "$PLATFORM" default-backup "$BACKUP_PROFILE" || true)"
+[ -n "$VALIDATE_COMMAND" ] || VALIDATE_COMMAND="$(platform_default_command "$PLATFORM" default-validate "$VALIDATION_PROFILE" || true)"
+[ -n "$MANAGEMENT_PROBE" ] || MANAGEMENT_PROBE="$(platform_default_command "$PLATFORM" default-management-probe "$VALIDATION_PROFILE" || true)"
+[ -n "$RECHECK_COUNT" ] || RECHECK_COUNT="${DEVICE_RECHECK_COUNT:-}"
+[ -n "$RECHECK_INTERVAL" ] || RECHECK_INTERVAL="${DEVICE_RECHECK_INTERVAL:-}"
+[ -n "$RECHECK_COUNT" ] || RECHECK_COUNT="0"
+[ -n "$RECHECK_INTERVAL" ] || RECHECK_INTERVAL="5"
+
+run_device_command() {
+  local cmd="$1"
+  run_transport_command "$TRANSPORT" "$HOST" "$USER_NAME" "$PORT" "$BASTION" "$COMMAND_TIMEOUT" "$cmd"
+}
+
+append_report() {
+  local report_file="$1"
+  local heading="$2"
+  local body="$3"
+  {
+    echo "## $heading"
+    echo
+    echo '```text'
+    echo "$body"
+    echo '```'
+    echo
+  } >> "$report_file"
+}
+
+if [ "$ACTION_CLASS" != "inspect" ]; then
+  PREFLIGHT_ARGS=( "$PROJECT_ROOT" --action-class "$ACTION_CLASS" )
+  [ -n "$ACTIVITY" ] && PREFLIGHT_ARGS+=( --activity "$ACTIVITY" )
+  [ "$CONFIRMED" = "true" ] && PREFLIGHT_ARGS+=( --confirmed )
+  "$SYS_AGENT_ROOT/bin/sys-preflight" "${PREFLIGHT_ARGS[@]}"
 fi
 
-INVENTORY_FILE="$ROOT/instances/$INSTANCE/inventory/hosts.yaml"
-if [ ! -f "$INVENTORY_FILE" ]; then
-    echo "Error: Inventory file not found at $INVENTORY_FILE"
-    exit 1
+if is_critical_action "$PROJECT_ROOT" "$ACTION_CLASS"; then
+  [ -n "$BACKUP_COMMAND" ] || die "critical remote action requires a backup command for $DEVICE_NAME"
+  [ -n "$VALIDATE_COMMAND" ] || die "critical remote action requires a validate command for $DEVICE_NAME"
+  [ -n "$MANAGEMENT_PROBE" ] || die "critical remote action requires a management probe for $DEVICE_NAME"
+  WITH_BACKUP="true"
+  WITH_VALIDATE="true"
+  if [ "$RECHECK_COUNT" = "0" ]; then
+    RECHECK_COUNT="2"
+  fi
 fi
 
-# Basic extraction (ideally use yq, but using grep/awk for portability)
-HOST_LINE=$(grep -A 6 "- name: $DEVICE_NAME" "$INVENTORY_FILE" | grep "host:" | head -1 || true)
-USER_LINE=$(grep -A 6 "- name: $DEVICE_NAME" "$INVENTORY_FILE" | grep "user:" | head -1 || true)
-PORT_LINE=$(grep -A 6 "- name: $DEVICE_NAME" "$INVENTORY_FILE" | grep "port:" | head -1 || true)
+REPORT_FILE=""
+SESSION_ID="$(timestamp_compact)"
+ROLLBACK_MANIFEST=""
+write_rollback_manifest() {
+  local rollback_id="$1"
+  local checkpoint_ref="$2"
+  local manifest="$PROJECT_ROOT/state/rollback/remote-$rollback_id.yaml"
+  yaml_instruction() {
+    python3 - "$1" <<'PY'
+import json
+import sys
+print("  - " + json.dumps(sys.argv[1]))
+PY
+  }
+  mkdir -p "$PROJECT_ROOT/state/rollback"
+  {
+    echo 'schema_version: 1'
+    echo "rollback_id: $rollback_id"
+    echo "created_at_utc: \"$(timestamp_utc)\""
+    echo "checkpoint_ref: \"$checkpoint_ref\""
+    echo 'instructions:'
+    if [ -n "$ROLLBACK_COMMAND" ]; then
+      yaml_instruction "Run rollback command on $DEVICE_NAME: $ROLLBACK_COMMAND"
+    else
+      yaml_instruction "Review remote backup output for $DEVICE_NAME before any manual rollback."
+      yaml_instruction "Use the platform backup/restore process for $PLATFORM."
+      yaml_instruction "Validate management reachability with: ${MANAGEMENT_PROBE:-no management probe defined}"
+    fi
+    yaml_instruction "Re-run validation command: ${VALIDATE_COMMAND:-no validation command defined}"
+    yaml_instruction "Record rollback outcome with sys-log."
+  } > "$manifest"
+  printf '%s\n' "$manifest"
+}
 
-if [ -z "$HOST_LINE" ]; then
-    echo "Error: Device '$DEVICE_NAME' not found in $INVENTORY_FILE"
-    exit 1
+if [ "$WRITE_REPORT" = "true" ]; then
+  REPORT_FILE="$PROJECT_ROOT/reports/latest/REMOTE_REPORT_${DEVICE_NAME}_$(timestamp_compact).md"
+  {
+    echo "# Remote Operation Report"
+    echo
+    echo "- generated_at_utc: $(timestamp_utc)"
+    echo "- device: $DEVICE_NAME"
+    echo "- platform: ${PLATFORM:-unknown}"
+    echo "- transport: $TRANSPORT"
+    echo "- action_class: $ACTION_CLASS"
+    echo "- activity: $ACTIVITY"
+    echo "- command_timeout_seconds: ${COMMAND_TIMEOUT:-default}"
+    echo "- recheck_count: $RECHECK_COUNT"
+    echo "- recheck_interval_seconds: $RECHECK_INTERVAL"
+    echo "- rollback_command_present: $([ -n "$ROLLBACK_COMMAND" ] && echo yes || echo no)"
+    echo
+  } > "$REPORT_FILE"
 fi
 
-HOST=$(echo "$HOST_LINE" | awk '{print $2}')
-USER=$(echo "$USER_LINE" | awk '{print $2}')
-PORT=$(echo "$PORT_LINE" | awk '{print $2}')
+if [ "$DRY_RUN" = "true" ]; then
+  echo "DRY RUN: transport=$TRANSPORT host=$HOST platform=${PLATFORM:-unknown} command=$COMMAND_STRING"
+  [ -n "$BACKUP_COMMAND" ] && echo "DRY RUN BACKUP: $BACKUP_COMMAND"
+  [ -n "$VALIDATE_COMMAND" ] && echo "DRY RUN VALIDATE: $VALIDATE_COMMAND"
+  [ -n "$MANAGEMENT_PROBE" ] && echo "DRY RUN PROBE: $MANAGEMENT_PROBE"
+  echo "DRY RUN RECHECK: count=$RECHECK_COUNT interval_seconds=$RECHECK_INTERVAL"
+  [ -n "$COMMAND_TIMEOUT" ] && echo "DRY RUN TIMEOUT: $COMMAND_TIMEOUT"
+  if [ "$ACTION_CLASS" != "inspect" ]; then
+    echo "DRY RUN ROLLBACK MANIFEST: $PROJECT_ROOT/state/rollback/remote-${DEVICE_NAME}-<session>.yaml"
+    [ -n "$ROLLBACK_COMMAND" ] && echo "DRY RUN ROLLBACK COMMAND: $ROLLBACK_COMMAND"
+  fi
+  exit 0
+fi
 
-# Set defaults
-[ -z "$USER" ] && USER="$USER" || USER="${USER:-root}"
-[ -z "$PORT" ] && PORT="${PORT:-22}"
+if [ -n "$MANAGEMENT_PROBE" ] && { [ "$WITH_VALIDATE" = "true" ] || is_critical_action "$PROJECT_ROOT" "$ACTION_CLASS"; }; then
+  PROBE_OUT="$(run_device_command "$MANAGEMENT_PROBE" 2>&1)"
+  [ "$WRITE_REPORT" = "true" ] && append_report "$REPORT_FILE" "Pre-Change Management Probe" "$PROBE_OUT"
+fi
 
-echo "Executing on $DEVICE_NAME ($USER@$HOST:$PORT)..."
-ssh -q -o BatchMode=yes -o StrictHostKeyChecking=accept-new -p "$PORT" "${USER}@${HOST}" "$COMMAND"
+if [ "$WITH_BACKUP" = "true" ] && [ -n "$BACKUP_COMMAND" ]; then
+  BACKUP_OUT="$(run_device_command "$BACKUP_COMMAND" 2>&1)"
+  [ "$WRITE_REPORT" = "true" ] && append_report "$REPORT_FILE" "Backup" "$BACKUP_OUT"
+fi
+
+if [ "$ACTION_CLASS" != "inspect" ]; then
+  ROLLBACK_MANIFEST="$(write_rollback_manifest "${DEVICE_NAME}-${SESSION_ID}" "remote-backup:${DEVICE_NAME}:${SESSION_ID}")"
+  [ "$WRITE_REPORT" = "true" ] && append_report "$REPORT_FILE" "Rollback Manifest" "$ROLLBACK_MANIFEST"
+fi
+
+CMD_OUT="$(run_device_command "$COMMAND_STRING" 2>&1)"
+printf '%s\n' "$CMD_OUT"
+[ "$WRITE_REPORT" = "true" ] && append_report "$REPORT_FILE" "Command Output" "$CMD_OUT"
+
+"$SYS_AGENT_ROOT/bin/sys-log" \
+  --project "$PROJECT_ROOT" \
+  --kind action \
+  --session-id "$SESSION_ID" \
+  --action-class "$ACTION_CLASS" \
+  --mode "$(current_mode "$PROJECT_ROOT")" \
+  --targets "$DEVICE_NAME" \
+  --command "$COMMAND_STRING" \
+  --rollback-refs "$ROLLBACK_MANIFEST" \
+  --message "remote command executed for $DEVICE_NAME"
+
+if is_critical_action "$PROJECT_ROOT" "$ACTION_CLASS"; then
+  "$SYS_AGENT_ROOT/bin/sys-log" \
+    --project "$PROJECT_ROOT" \
+    --kind critical \
+    --session-id "$SESSION_ID" \
+    --action-class "$ACTION_CLASS" \
+    --mode "$(current_mode "$PROJECT_ROOT")" \
+    --targets "$DEVICE_NAME" \
+    --command "$COMMAND_STRING" \
+    --rollback-refs "$ROLLBACK_MANIFEST" \
+    --message "critical remote command executed for $DEVICE_NAME"
+fi
+
+if [ "$WITH_VALIDATE" = "true" ] && [ -n "$VALIDATE_COMMAND" ]; then
+  VALIDATE_OUT="$(run_device_command "$VALIDATE_COMMAND" 2>&1)"
+  [ "$WRITE_REPORT" = "true" ] && append_report "$REPORT_FILE" "Validation" "$VALIDATE_OUT"
+fi
+
+if [ -n "$MANAGEMENT_PROBE" ] && { [ "$WITH_VALIDATE" = "true" ] || is_critical_action "$PROJECT_ROOT" "$ACTION_CLASS"; }; then
+  POST_PROBE_OUT="$(run_device_command "$MANAGEMENT_PROBE" 2>&1)"
+  [ "$WRITE_REPORT" = "true" ] && append_report "$REPORT_FILE" "Post-Change Management Probe" "$POST_PROBE_OUT"
+fi
+
+if [ -n "$MANAGEMENT_PROBE" ] && [ "${RECHECK_COUNT:-0}" -gt 0 ]; then
+  RECHECK_INDEX=1
+  while [ "$RECHECK_INDEX" -le "$RECHECK_COUNT" ]; do
+    sleep "$RECHECK_INTERVAL"
+    RECHECK_OUT="$(run_device_command "$MANAGEMENT_PROBE" 2>&1)"
+    [ "$WRITE_REPORT" = "true" ] && append_report "$REPORT_FILE" "Delayed Management Recheck $RECHECK_INDEX" "$RECHECK_OUT"
+    RECHECK_INDEX=$((RECHECK_INDEX + 1))
+  done
+fi
+
+if [ "$WRITE_REPORT" = "true" ]; then
+  echo "Report written to $REPORT_FILE" >&2
+fi

@@ -1,0 +1,16 @@
+=== OLLAMA MODELS ===
+
+=== DOCKER ===
+Docker version 26.1.0
+
+=== KUBECTL ===
+
+=== NODE ===
+v22.1.0
+
+=== PYTHON ===
+Python 3.12.3
+
+=== GO ===
+
+=== CARGO ===

@@ -1,11 +1,25 @@
-# Sys-Agent Core - Repo Precedence Model
+# SACST Repo Precedence Model
+
+## Detection Order
+
+When an agent operating through a project repo enters another repository, it must inspect for:
+
+1. Nested or repo-root `AGENTS.md`
+2. `GEMINI.md`
+3. `CLAUDE.md`
+4. `.cursor/rules/`
+5. `.github/copilot-instructions.md`
+6. `.github/instructions/`
 
 ## Rule
-When an agent is launched from the instance control directory and then works on a target repository, it must:
-1. Detect local repo instructions FIRST.
-2. Inspect the repo for `.cursor/rules/`, `AGENTS.md`, `GEMINI.md`, `CLAUDE.md`, or `.github/copilot-instructions.md`.
-3. Obey target repo instructions for files in their scope.
-4. Use Sys-Agent Core ONLY for orchestration, operating safety, state capture, and non-conflicting workflow policy.
 
-## Conflict Resolution
-If a conflict exists between the repo instructions and Sys-Agent Core (e.g., repo says "use npm", system says "use yarn for all projects"), the REPO LOCAL instruction wins. Sys-Agent Core governs the *machine*, not the *codebase*.
+Target-repo local instructions win for files inside that repo.
+
+SACST continues to govern:
+
+- machine safety
+- runtime state capture
+- checkpointing
+- logging
+- rollback
+- remote execution discipline

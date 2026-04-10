@@ -1,22 +1,27 @@
-# Sys-Agent Core - Runbook
+# SACST Runbook
 
-## Setup (New Instance)
-1. Ensure you are on the target machine.
-2. Run `~/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE/bin/sys-init <InstanceName>`.
-3. Verify `~/.MyAdminZ/<InstanceName>/context/raw-audit/` is populated.
+## Scaffold a Project Repo
 
-## Refresh (Update State)
-1. Run `~/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE/bin/sys-refresh <InstanceName>`.
-2. The agent should re-normalize the raw audits into updated Markdown truth.
+1. Run `bin/sys-init <InstanceName>`.
+2. Confirm the project repo was created outside SACST.
+3. Run `bin/sys-validate --project <project-path>`.
 
-## Validation
-1. Use `sys-validate` (upcoming M7 tool) or manually check `logs/critical-actions.jsonl` after major tasks.
-2. Verify `MODE_STATE.yaml` matches the expected agent operational boundary.
+## Refresh a Project Repo
 
-## Rollback
-1. If a critical action failed, locate the `rollback_refs` in `critical-actions.jsonl`.
-2. Restore the configuration from `state/checkpoints/`.
+1. Run `bin/sys-refresh <project-path>`.
+2. Review normalized context and freshness state.
+3. Regenerate adapters if needed.
 
-## Promotion
-1. Review `framework/learning/candidates/`.
-2. Merge successful changes into `framework/templates/` or canonical documents.nical documents.
+## Refresh an Inventory Device
+
+1. Confirm the device entry in `inventory/devices.yaml`.
+2. Run `bin/sys-refresh <project-path> --device <device-name>`.
+3. Review `context/normalized/devices/<device-name>/`.
+4. Review `runtime/devices/<device-name>/DEVICE_STATE.yaml`.
+5. Use `--output-scope both` only when intentionally promoting that device capture into the project’s primary normalized context.
+
+## Sync Template Improvements
+
+1. Review template changes in SACST.
+2. Run `bin/sys-sync-template <project-path>`.
+3. Re-run project validation and adapter generation.

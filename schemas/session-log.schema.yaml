@@ -1,7 +1,24 @@
 $schema: "http://json-schema.org/draft-07/schema#"
+title: "Session Log Entry"
 type: object
+required:
+  - schema_version
+  - session_id
+  - tool_name
+  - started_at
 properties:
-  session_id: { type: string }
-  started_at: { type: string }
-  ended_at: { type: string }
-  tool_name: { type: string }
+  schema_version:
+    type: integer
+    const: 1
+  session_id:
+    type: string
+  tool_name:
+    type: string
+  started_at:
+    type: string
+  ended_at:
+    type: string
+  task_summary:
+    type: string
+  outcome:
+    type: string

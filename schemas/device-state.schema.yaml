@@ -1,0 +1,22 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Device State"
+type: object
+required:
+  - schema_version
+  - device_name
+  - platform_family
+  - last_collected_at_utc
+properties:
+  schema_version:
+    type: integer
+    const: 1
+  device_name:
+    type: string
+  platform_family:
+    type: string
+  collection_scope:
+    type: string
+  last_collected_at_utc:
+    type: string
+  last_validated_at_utc:
+    type: string

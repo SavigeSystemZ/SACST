@@ -1,12 +1,19 @@
-# Sys-Agent Core - Learning Loop
+# SACST Learning Loop
 
 ## Purpose
-Enable supervised self-evolution of the framework without risking autonomous corruption.
 
-## Workflow
-1. **Feedback Capture:** Session outcomes and user ratings (liked/disliked) are recorded in `logs/feedback.jsonl`.
-2. **Candidate Generation:** The agent extracts repeated successful patterns into `framework/learning/candidates/`.
-3. **Promotion Gate:** The user explicitly reviews candidates.
-4. **Acceptance/Rejection:**
-   - Accepted patterns are moved to `framework/learning/accepted/` and integrated into `framework/templates/`.
-   - Rejected patterns are moved to `framework/learning/rejected/`.
+Allow SACST to improve safely from successful project outcomes without letting live project state corrupt the template.
+
+## Flow
+
+1. Export a sanitized candidate from a project repo.
+2. Store it in `learning/candidates/` with provenance and affected surfaces.
+3. Run conflict, schema, adapter, and fixture impact review.
+4. Require explicit approval before promotion.
+5. Promote into canonical docs, templates, adapters, schemas, or platform modules.
+
+## Rules
+
+- No direct promotion from a live project repo into SACST.
+- No unsanitized host-specific identifiers in promoted content.
+- Every promotion must update validation coverage if behavior changes.

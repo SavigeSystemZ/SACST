@@ -1,0 +1,26 @@
+schema_version: 1
+transport_modes:
+  - ssh
+captures:
+  - outfile: 01_system_info.txt
+    command: |
+      opnsense-version 2>/dev/null || true
+      echo
+      uname -a 2>/dev/null || true
+      echo
+      hostname=$(hostname 2>/dev/null || echo unknown)
+      echo "hostname=$hostname"
+      sysctl -n kern.osrelease 2>/dev/null | awk '{print "kernel="$0}'
+      sysctl -n hw.model 2>/dev/null | awk '{print "model="$0}'
+  - outfile: 02_interfaces.txt
+    command: ifconfig -a 2>/dev/null || true
+  - outfile: 03_services.txt
+    command: service -e 2>/dev/null || configctl system status 2>/dev/null || true
+  - outfile: 04_firewall_rules.txt
+    command: pfctl -sr 2>/dev/null || true
+  - outfile: 05_routes.txt
+    command: netstat -rn 2>/dev/null || true
+  - outfile: 06_aliases.txt
+    command: configctl filter list aliases 2>/dev/null || true
+  - outfile: 07_vpn.txt
+    command: configctl openvpn status 2>/dev/null || true

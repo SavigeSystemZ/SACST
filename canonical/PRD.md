@@ -1,30 +1,26 @@
-# Sys-Agent Core - Product Requirements Document (PRD)
+# SACST Product Requirements
 
 ## Purpose
-A multi-agent operations control plane designed to let CLI AI agents collaborate with the user to inspect, configure, repair, optimize, and operate infrastructure safely and efficiently. This includes local workstations, remote Linux servers, OPNsense firewalls, and network switches via SSH.
+
+SACST is a reusable template and meta-system for AI-assisted systems administration and network administration. It produces self-contained project repos that help agents inspect, configure, repair, validate, and document Linux systems, Windows systems, OPNsense firewalls, managed switches, routers, vendor appliances, and related infrastructure safely.
+
+## Primary Outcomes
+
+1. Give AI agents a reliable control plane for infrastructure work.
+2. Reduce hallucination by grounding agents in normalized host and network truth.
+3. Enforce safety through mode gating, validation, checkpointing, rollback, and anti-lockout workflows.
+4. Improve the template over time through a supervised meta-system.
+5. Support current vendor, OS, appliance, Windows, Linux, and security-tool command research without storing live project findings in the template.
 
 ## Users
-- Human User (SysAdmin / Network Admin / Operator)
-- CLI AI Agents (Gemini CLI, Cursor, Copilot, Claude, Aider, Agent Zero, etc.)
 
-## Jobs-to-be-done
-1. **Understand the Infrastructure:** Quickly ingest hardware, software, network topology, and configuration facts across a fleet of devices to provide tailored advice.
-2. **Execute Operations:** Safely perform system configurations, software installations, file modifications, and network state changes (VLANs, firewall rules, routing).
-3. **Ensure Safety:** Provide strict boundaries, logging, rollback capabilities for critical actions, and prevent network lockouts during remote SSH operations.
-4. **Self-Improvement:** Learn from past interactions to refine templates and operational policies over time.
+- Human operators
+- Codex, Gemini, Claude, Cursor, Copilot, Aider, Agent Zero, Windsurf, Grok, DeepSeek, and similar tools
 
 ## Non-Goals
-- Full autonomous takeover without user consent (unless explicitly granted via YOLO mode).
-- Replacement of repo-local instructions (Sys-Agent Core augments, not overrides, project-specific contexts).
-- Centralized heavyweight orchestration (like Ansible/Terraform); this is a lightweight agentic control plane.
 
-## Success Metrics
-- Zero unrecoverable system or network breakages caused by AI agents.
-- Reduction in agent "hallucinations" regarding infrastructure state and capabilities.
-- Successful adoption and cross-compatibility across at least 3 different CLI AI agents.
-
-## MVP Scope
-- Foundational directory structure and control files for local and remote devices.
-- `default` instance implementation capturing local OS context and a sample network inventory.
-- YOLO protocol definition and basic logging schemas.
-- Support for SSH-based auditing of Linux, OPNsense, and standard network switches.
+- Hosting live instance runtime inside SACST
+- Acting like an application-project framework
+- Replacing target-repo local instructions during later repo pivots
+- Heavy centralized orchestration such as full IaC replacement
+- Storing credentials, private configs, exploit evidence, or target-specific security findings in SACST

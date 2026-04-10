@@ -1,0 +1,10 @@
+schema_version: 1
+provider: github
+host: github.com
+org: SavigeSystemZ
+protocol: ssh
+default_branch: main
+visibility: private
+create_remote_if_possible: false
+user_name: Michael Spaulding
+user_email: mtspaulding87@gmail.com

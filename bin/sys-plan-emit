@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+[ $# -ge 3 ] || { echo "Usage: sys-plan-emit <project-path|instance-name> <mission|plan|next> <message...>" >&2; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+TYPE="$2"
+shift 2
+MESSAGE="$*"
+
+case "$TYPE" in
+  mission) FILE="$PROJECT_ROOT/runtime/CURRENT_MISSION.md" ;;
+  plan) FILE="$PROJECT_ROOT/runtime/CURRENT_PLAN.md" ;;
+  next) FILE="$PROJECT_ROOT/runtime/NEXT_ACTIONS.md" ;;
+  *) die "unsupported type: $TYPE" ;;
+esac
+
+mkdir -p "$(dirname "$FILE")"
+printf '# %s\n\n%s\n' "$(tr '[:lower:]' '[:upper:]' <<< "$TYPE")" "$MESSAGE" > "$FILE"
+echo "Updated $FILE"

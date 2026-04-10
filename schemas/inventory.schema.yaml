@@ -1,35 +1,79 @@
 $schema: "http://json-schema.org/draft-07/schema#"
-title: "Inventory State Schema"
-description: "Defines the remote devices and network infrastructure managed by Sys-Agent Core"
+title: "Inventory"
 type: object
-required: [devices]
+required:
+  - schema_version
+  - devices
 properties:
+  schema_version:
+    type: integer
+    const: 1
   devices:
     type: array
     items:
       type: object
-      required: [name, type, host]
+      required:
+        - name
+        - platform_family
+        - role
+        - host
+        - transport
+        - auth_ref
+        - validation_profile
+        - risk_class
       properties:
         name:
           type: string
-          description: "Friendly name of the device"
-        type:
+        platform_family:
           type: string
-          enum: [linux-server, opnsense-firewall, network-switch, other]
-          description: "The OS or platform type"
-        host:
-          type: string
-          description: "IP address or hostname"
-        port:
-          type: integer
-          default: 22
-          description: "SSH Port"
-        user:
-          type: string
-          description: "SSH Username"
-        ssh_key_path:
-          type: string
-          description: "Path to the SSH private key"
+          enum: [linux-desktop, linux-server, windows-desktop, windows-server, opnsense, switch, router, firewall, wireless-controller, nas, storage, hypervisor, generic-vendor, other]
         role:
           type: string
-          description: "Primary role (e.g., edge-router, core-switch)"
+        host:
+          type: string
+        transport:
+          type: string
+          enum: [local, ssh, https, console, api, other]
+        auth_ref:
+          type: string
+        user:
+          type: string
+        port:
+          type: integer
+        bastion:
+          type: string
+        validation_profile:
+          type: string
+        backup_profile:
+          type: string
+        collector_profile:
+          type: string
+        backup_command:
+          type: string
+        rollback_capability:
+          type: string
+        risk_class:
+          type: string
+        validate_command:
+          type: string
+        management_probe:
+          type: string
+        management_interface:
+          type: string
+        network_zone:
+          type: string
+        maintenance_window:
+          type: string
+        command_timeout_seconds:
+          type: integer
+          minimum: 1
+        recheck_count:
+          type: integer
+          minimum: 0
+        recheck_interval_seconds:
+          type: integer
+          minimum: 0
+        tags:
+          type: array
+          items:
+            type: string

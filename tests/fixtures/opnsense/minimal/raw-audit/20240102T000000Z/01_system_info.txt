@@ -1,0 +1,9 @@
+# collected_at_utc=20240102T000000Z
+# host=edge-fw
+# command=opnsense-version; uname -a
+
+OPNsense 24.7.1_1-amd64
+FreeBSD edge-fw 13.2-RELEASE-p11 FreeBSD 13.2-RELEASE-p11 GENERIC amd64
+hostname=edge-fw
+kernel=13.2-RELEASE-p11
+model=DEC740

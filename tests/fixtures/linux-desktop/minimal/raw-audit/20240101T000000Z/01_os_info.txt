@@ -1,0 +1,10 @@
+# collected_at_utc=20240101T000000Z
+# host=minimal-host
+# command=uname -a; cat /etc/os-release
+
+Linux minimal-host 6.8.0-test x86_64 GNU/Linux
+
+NAME="Ubuntu"
+VERSION="24.04 LTS (Noble Numbat)"
+ID=ubuntu
+VERSION_ID="24.04"

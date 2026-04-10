@@ -1,0 +1,13 @@
+# collected_at_utc=2024-01-04T00:00:00Z
+# host=windows-fixture
+# transport=fixture
+
+Name           Enabled Description
+----           ------- -----------
+Administrator  False   Built-in account
+ops            True    Operator account
+
+Name                    Description
+----                    -----------
+Administrators          Administrators have complete and unrestricted access
+Remote Management Users Members can access WMI resources

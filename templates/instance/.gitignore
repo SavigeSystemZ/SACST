@@ -1,0 +1,8 @@
+raw-audit/
+runtime/
+logs/
+state/
+reports/history/
+reports/latest/
+research/cache/
+research/raw/

@@ -1,13 +1,23 @@
-# Sys-Agent Core - Error Handling Policy
+# SACST Error Handling Policy
 
-## The "Diagnose-Snapshot-Propose" Loop
+## Loop
 
-1. **Detection:** When a command fails, identify the error type (Permission, Missing Dependency, Syntax, System State).
-2. **Diagnosis:** Run a non-mutating inspection (e.g., `ls -l`, `check-config`) to find the root cause.
-3. **Snapshot:** If a fix involves modifying a file, create a pre-change backup in `state/checkpoints/`.
-4. **Proposal:** State the proposed fix, the expected outcome, and the rollback steps.
-5. **Approval:** In **Operator** mode, wait for user "OK". In **YOLO** mode, proceed and log.
+1. Detect the failure.
+2. Diagnose without mutation.
+3. Check whether freshness, permissions, or precedence caused the failure.
+4. Create or confirm a checkpoint before risky remediation.
+5. Propose or execute the fix according to mode.
+6. Validate and log the result.
 
-## Escalation
-- If a fix fails 3 times, **stop** and ask the user for guidance.
-- If a fix results in a critical service failure (e.g., `systemd` unit not starting), revert to the last snapshot immediately.
+## Self-Healing Boundary
+
+- Use `bin/sys-fix --template` only for known-safe SACST mechanical drift.
+- Use `bin/sys-fix <project>` only for known-safe project contract drift.
+- Use `bin/sys-reconcile-project <project>` when existing normalized context lacks current manifest/runtime metadata.
+- Do not use self-healing commands to perform device configuration changes or to delete unknown project-specific data.
+
+## Stop Conditions
+
+- Stop after repeated failed remediations.
+- Stop when management reachability is at risk and anti-lockout protection is not confirmed.
+- Stop when secret exposure would be required.

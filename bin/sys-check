@@ -1,52 +1,5 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
-INSTANCE="${1:-GhostZ}"
-OUT_FILE="$ROOT/instances/$INSTANCE/runtime/SECURITY_STATE.yaml"
-
-echo "=== Sys-Agent Core OS Check: $INSTANCE ==="
-echo "Auditing host OS for GhostZ..."
-
-{
-    echo "host: $(hostname)"
-    echo "audit_ts: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "posture:"
-
-    # UFW Check
-    if command -v ufw >/dev/null && sudo ufw status | grep -q "Status: active"; then
-        echo "  ufw_active: true"
-    else
-        echo "  ufw_active: false"
-    fi
-
-    # Fail2Ban Check
-    if systemctl is-active fail2ban >/dev/null 2>&1; then
-        echo "  fail2ban_active: true"
-    else
-        echo "  fail2ban_active: false"
-    fi
-
-    # CrowdSec Check
-    if systemctl is-active crowdsec >/dev/null 2>&1; then
-        echo "  crowdsec_active: true"
-    else
-        echo "  crowdsec_active: false"
-    fi
-
-    # USBGuard Check
-    if systemctl is-active usbguard >/dev/null 2>&1; then
-        echo "  usbguard_active: true"
-    else
-        echo "  usbguard_active: false"
-    fi
-
-    # SSH Root Login Check
-    if grep -q "^PermitRootLogin yes" /etc/ssh/sshd_config 2>/dev/null; then
-        echo "  ssh_root_login_permitted: true"
-    else
-        echo "  ssh_root_login_permitted: false"
-    fi
-} > "$OUT_FILE"
-
-echo "OS check complete. Status written to $OUT_FILE"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+exec "$ROOT/bin/sys-validate" --project "$1"

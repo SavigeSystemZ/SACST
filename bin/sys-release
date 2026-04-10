@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+TAG_RELEASE="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tag)
+      TAG_RELEASE="true"
+      shift
+      ;;
+    --dry-run)
+      shift
+      ;;
+    *)
+      die "unexpected argument: $1"
+      ;;
+  esac
+done
+
+VERSION="$(template_version)"
+TAG="sacst-v$VERSION"
+
+"$SYS_AGENT_ROOT/bin/sys-validate" --template
+"$SYS_AGENT_ROOT/bin/sys-meta-check" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_scaffold.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_normalize.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_normalize_windows.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_generic_vendor.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_normalize_opnsense.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_normalize_switch.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_refresh_device_opnsense.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_refresh_device_both.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_refresh_device_profile.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_adopt_existing.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_reconcile_project.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_meta_check.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_sys_fix_project.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_sys_fix_template.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_git_bootstrap.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_log_validation.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_stale_preflight.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_sync_dry_run.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_sync_preserves_context.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_remote_dry_run.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_remote_profile_dry_run.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_remote_rollback_manifest.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_security_scope.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_research_plan.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_platform_plan.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_destructive_preflight.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_learning_flow.sh" >/dev/null
+
+echo "Release candidate validated for version $VERSION"
+echo "Suggested tag: $TAG"
+
+if [ "$TAG_RELEASE" = "true" ]; then
+  git -C "$SYS_AGENT_ROOT" tag "$TAG"
+  echo "Created local git tag $TAG"
+fi

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+[ $# -eq 2 ] || { echo "Usage: sys-promote-candidate <candidate-file> <accept|reject>" >&2; exit 1; }
+
+SOURCE_FILE="$(realpath_safe "$1")"
+ACTION="$2"
+
+[ -f "$SOURCE_FILE" ] || die "candidate file not found: $SOURCE_FILE"
+
+case "$ACTION" in
+  accept) DEST_DIR="$SYS_AGENT_ROOT/learning/accepted" ;;
+  reject) DEST_DIR="$SYS_AGENT_ROOT/learning/rejected" ;;
+  *) die "action must be accept or reject" ;;
+esac
+
+mkdir -p "$DEST_DIR"
+mv "$SOURCE_FILE" "$DEST_DIR/"
+echo "$(basename "$SOURCE_FILE") moved to $DEST_DIR"

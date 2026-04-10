@@ -1,17 +1,26 @@
-# Sys-Agent Core - Non-Functional Requirements
+# SACST Non-Functional Requirements
 
 ## Security
-- Credentials and sensitive tokens must never be logged or stored in instance state.
-- YOLO mode must still enforce logging and checkpointing for critical action classes.
+
+- SACST must never persist secrets in canonical template artifacts.
+- SACST must never persist project-specific target findings, exploit evidence, private configs, or raw credential material.
+- Critical actions must require logging, checkpointing, and validation.
+- Repo-precedence detection must protect target repos from host-side override.
+- Security assessment actions must be default-deny unless a project-local scope file allows the activity.
 
 ## Reliability
-- The system must function entirely locally, independent of cloud services (excluding the LLMs themselves).
-- State files must be parseable YAML/JSONL.
+
+- Project repos must remain usable without runtime path dependencies back to SACST.
+- Generated files must include provenance and schema/version metadata.
+- Validation commands must distinguish template validation from project validation.
 
 ## Auditability
-- Every action performed in Operator or YOLO mode must generate a discrete entry in the action logs.
-- Source references and timestamps must be present in all normalized context files.
+
+- Every mutation and every critical read must be attributable to a session, actor, mode, and target.
+- Rollback information must exist for all critical actions.
 
 ## Portability
-- The `framework/` directory must contain zero hardcoded references to the initial `GhostZ` instance.
-- A new instance on a different OS must be bootable simply by running `sys-init <InstanceName>`.
+
+- SACST must not hardcode any specific host such as GhostZ.
+- Platform support must be modular and extensible.
+- Vendor and command research must be source-cited, project-local, and replaceable as vendor behavior changes.

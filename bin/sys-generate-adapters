@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: sys-generate-adapters <project-path|instance-name>
+EOF
+}
+
+[ $# -eq 1 ] || { usage; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+INSTANCE_ID="$(project_instance "$PROJECT_ROOT")"
+PLATFORM="$(project_platform "$PROJECT_ROOT")"
+VERSION="$(template_version)"
+MODE="$(current_mode "$PROJECT_ROOT")"
+LAST_REFRESH="$(yaml_scalar "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" last_refresh_utc 2>/dev/null || true)"
+
+mkdir -p "$PROJECT_ROOT/.github/instructions" "$PROJECT_ROOT/.cursor/rules" "$PROJECT_ROOT/runtime"
+
+cat > "$PROJECT_ROOT/AGENTS.md" <<EOF
+# SYS-Agent Project Contract — $INSTANCE_ID
+
+This repo is a self-contained SACST-derived project repo for system and network operations.
+
+## Read Order
+
+1. \`AGENTS.md\`
+2. \`control/PROJECT_PROFILE.yaml\`
+3. \`control/MODE_POLICY.yaml\`
+4. \`control/PERMISSIONS_POLICY.yaml\`
+5. \`control/FRESHNESS_POLICY.yaml\`
+6. \`control/RESEARCH_POLICY.yaml\`
+7. \`control/CREDENTIAL_REFERENCES.yaml\`
+8. \`control/SECURITY_SCOPE.yaml\`
+9. \`control/SYSTEM_MAP.md\`
+10. \`context/normalized/HOST_PROFILE.md\`
+11. \`inventory/devices.yaml\`
+12. \`runtime/RUNTIME_STATE.yaml\`
+13. \`context/normalized/devices/<device-name>/\` when the task targets a specific inventory-managed device
+
+## Rules
+
+- Use normalized context as source of truth unless stale.
+- When the task targets a specific inventory device, load that device bundle under \`context/normalized/devices/<device-name>/\` and its runtime state under \`runtime/devices/<device-name>/DEVICE_STATE.yaml\`.
+- Use live research for unfamiliar or version-sensitive vendor, Windows, Linux, appliance, or security-tool syntax when \`control/RESEARCH_POLICY.yaml\` requires it.
+- Store only credential references from \`control/CREDENTIAL_REFERENCES.yaml\`; never store raw secrets in this repo or logs.
+- Treat security testing as defensive-only unless \`control/SECURITY_SCOPE.yaml\` explicitly authorizes the activity and rules of engagement.
+- Use \`bin/sys-research-plan\` for project-local research notes when command syntax or vendor behavior is uncertain.
+- Use \`bin/sys-platform-plan\` before mutating unmodeled vendors, devices, access methods, or management planes.
+- Use \`bin/sys-scope-check\` or preflight \`--activity\` gates before security testing.
+- Use project-local policies for machine operations and safety.
+- Never write back into SACST directly from this repo.
+- If you pivot into another repository, detect and obey that repo's local instruction files first.
+- This repo is for sysadmin and network-admin work, not generic application building.
+
+## Current Profile
+
+- instance_id: $INSTANCE_ID
+- platform: $PLATFORM
+- template_version: $VERSION
+- mode: $MODE
+- last_refresh_utc: ${LAST_REFRESH:-unknown}
+EOF
+
+cat > "$PROJECT_ROOT/GEMINI.md" <<EOF
+# Gemini Operating Context — $INSTANCE_ID
+
+Load \`AGENTS.md\` first.
+
+Then load:
+
+- \`control/PROJECT_PROFILE.yaml\`
+- \`control/SYSTEM_MAP.md\`
+- \`control/RESEARCH_POLICY.yaml\`
+- \`control/CREDENTIAL_REFERENCES.yaml\`
+- \`control/SECURITY_SCOPE.yaml\`
+- \`context/normalized/HOST_PROFILE.md\`
+- \`inventory/devices.yaml\`
+- \`runtime/RUNTIME_STATE.yaml\`
+
+This project repo is a SACST-derived operational control plane for $PLATFORM.
+EOF
+
+cat > "$PROJECT_ROOT/CLAUDE.md" <<EOF
+# Claude Operating Context — $INSTANCE_ID
+
+Start with \`AGENTS.md\`.
+
+This is a SACST-derived sysadmin/network-admin project repo for $PLATFORM.
+Treat project-local truth as authoritative for the managed environment.
+Use project-local research and security scope files before vendor command research or security assessment.
+EOF
+
+cat > "$PROJECT_ROOT/.github/copilot-instructions.md" <<EOF
+Follow \`AGENTS.md\` in the project root first.
+
+This repo is an operational control plane derived from SACST.
+Use project-local normalized context and inventory for machine truth.
+Do not store raw credentials; use credential references and project-local security scope.
+If you enter another repository, that repo's local instructions take precedence for edits there.
+EOF
+
+cat > "$PROJECT_ROOT/.github/instructions/sys-agent.instructions.md" <<EOF
+# Project Instruction Bundle
+
+- project repo: $INSTANCE_ID
+- primary platform: $PLATFORM
+- template version: $VERSION
+- current mode: $MODE
+- role: sysadmin/network-admin operational control plane
+- research policy: control/RESEARCH_POLICY.yaml
+- credential policy: control/CREDENTIAL_REFERENCES.yaml
+- security scope: control/SECURITY_SCOPE.yaml
+EOF
+
+cat > "$PROJECT_ROOT/.cursor/rules/10-precedence.mdc" <<'EOF'
+---
+description: "Project repo precedence rules"
+globs: ["**/*"]
+---
+
+- Read `AGENTS.md` in the project root first.
+- Use project-local normalized truth for machine operations.
+- Use project-local research, credential reference, and security scope files for vendor command research or security assessment.
+- When operating in another repository, obey that repo's local instruction files first.
+EOF
+
+cat > "$PROJECT_ROOT/.cursor/rules/20-safety.mdc" <<'EOF'
+---
+description: "Project repo safety rules"
+globs: ["**/*"]
+---
+
+- Treat boot, crypto, auth, firewall, routing, and core-service changes as critical actions.
+- Use project preflight, checkpoint, validation, and rollback workflows for risky changes.
+- Do not expose secrets in logs or repo files.
+- Security testing is defensive-only unless `control/SECURITY_SCOPE.yaml` explicitly allows the activity.
+- Unmodeled vendor/device changes require a project-local platform plan before mutation.
+EOF
+
+cat > "$PROJECT_ROOT/runtime/ADAPTER_MANIFEST.yaml" <<EOF
+schema_version: 1
+generated_at_utc: "$(timestamp_utc)"
+template_version: $VERSION
+outputs:
+  - $PROJECT_ROOT/AGENTS.md
+  - $PROJECT_ROOT/GEMINI.md
+  - $PROJECT_ROOT/CLAUDE.md
+  - $PROJECT_ROOT/.github/copilot-instructions.md
+  - $PROJECT_ROOT/.github/instructions/sys-agent.instructions.md
+  - $PROJECT_ROOT/.cursor/rules/10-precedence.mdc
+  - $PROJECT_ROOT/.cursor/rules/20-safety.mdc
+EOF
+
+echo "Generated adapter surfaces for: $PROJECT_ROOT"

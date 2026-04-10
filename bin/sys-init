@@ -1,175 +1,152 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
-INSTANCE="${1:-GhostZ}"
-HOST="$(hostname -s 2>/dev/null || hostname)"
-TS="$(date -u +%Y%m%dT%H%M%SZ)"
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
 
-INST_DIR="$ROOT/instances/$INSTANCE"
-RAW_DIR="$INST_DIR/context/raw-audit/$TS"
-NORM_DIR="$INST_DIR/context/normalized"
-RUNTIME_DIR="$INST_DIR/runtime"
-LOG_DIR="$INST_DIR/logs"
-STATE_DIR="$INST_DIR/state"
-
-mkdir -p \
-  "$ROOT/framework/bin" \
-  "$ROOT/framework/canonical" \
-  "$ROOT/framework/schemas" \
-  "$ROOT/framework/templates/cursor" \
-  "$ROOT/framework/platforms/linux-desktop/commands" \
-  "$ROOT/framework/adapters" \
-  "$ROOT/framework/learning/candidates" \
-  "$ROOT/framework/learning/accepted" \
-  "$ROOT/framework/learning/rejected" \
-  "$ROOT/framework/learning/patterns" \
-  "$ROOT/framework/learning/sessions" \
-  "$RAW_DIR" \
-  "$NORM_DIR" \
-  "$RUNTIME_DIR" \
-  "$INST_DIR/control/.cursor/rules" \
-  "$INST_DIR/control/.github/instructions" \
-  "$LOG_DIR" \
-  "$STATE_DIR/backups" \
-  "$STATE_DIR/checkpoints" \
-  "$STATE_DIR/diffs" \
-  "$STATE_DIR/exports" \
-  "$INST_DIR/prompts" \
-  "$INST_DIR/inventory" \
-  "$INST_DIR/reports/latest" \
-  "$INST_DIR/reports/history"
-
-run_capture() {
-  local outfile="$1"
-  shift
-  {
-    echo "# collected_at_utc=$TS"
-    echo "# host=$HOST"
-    echo "# command=$*"
-    echo
-    "$@" || true
-  } > "$RAW_DIR/$outfile"
+usage() {
+  cat <<'EOF'
+Usage: sys-init <instance-name> [--path <project-path>] [--platform <platform>] [--adopt-existing] [--no-refresh] [--no-git-bootstrap] [--create-remote] [--dry-run]
+EOF
 }
 
-run_capture "01_os_info.txt" bash -lc 'uname -a; echo; cat /etc/os-release'
-run_capture "02_hardware_info.txt" bash -lc 'lscpu; echo; free -h; echo; lsblk; echo; lspci'
-run_capture "03_installed_packages.txt" bash -lc 'dpkg-query -W -f='"'"'${binary:Package} ${Version}\n'"'"''
-run_capture "04_snap_flatpak_apps.txt" bash -lc 'snap list 2>/dev/null; echo; flatpak list 2>/dev/null'
-run_capture "05_home_dotfiles.txt" bash -lc 'ls -A1 "$HOME" | grep "^\." || true'
-run_capture "06_dev_tools_and_ai.txt" bash -lc '
-  echo "=== OLLAMA MODELS ==="; ollama list 2>/dev/null
-  echo; echo "=== DOCKER ==="; docker --version 2>/dev/null
-  echo; echo "=== KUBECTL ==="; kubectl version --client 2>/dev/null
-  echo; echo "=== NODE ==="; node --version 2>/dev/null
-  echo; echo "=== PYTHON ==="; python3 --version 2>/dev/null
-  echo; echo "=== GO ==="; go version 2>/dev/null
-  echo; echo "=== CARGO ==="; cargo --version 2>/dev/null
-'
-run_capture "07_running_services.txt" bash -lc 'systemctl list-units --type=service --state=running'
-run_capture "08_ports.txt" bash -lc 'ss -tulpn'
-run_capture "09_docker_runtime.txt" bash -lc 'docker ps -a 2>/dev/null; echo; docker network ls 2>/dev/null'
-run_capture "10_ollama_runtime.txt" bash -lc 'ollama ps 2>/dev/null; echo; ollama list 2>/dev/null'
-run_capture "11_gpu.txt" bash -lc 'nvidia-smi 2>/dev/null'
-run_capture "12_network.txt" bash -lc 'ip addr; echo; ip route; echo; resolvectl status 2>/dev/null || true'
+[ $# -ge 1 ] || { usage; exit 1; }
 
-cat > "$RUNTIME_DIR/SYSTEM_STATE.yaml" <<EOF
-instance: "$INSTANCE"
-host: "$HOST"
-root: "$ROOT"
-platform_class: "linux-desktop"
-collected_at_utc: "$TS"
-latest_raw_audit_dir: "$RAW_DIR"
-normalized_context_dir: "$NORM_DIR"
-mode_file: "$RUNTIME_DIR/MODE_STATE.yaml"
-mission_file: "$RUNTIME_DIR/CURRENT_MISSION.md"
-plan_file: "$RUNTIME_DIR/CURRENT_PLAN.md"
-permissions_file: "$RUNTIME_DIR/PERMISSIONS_EFFECTIVE.yaml"
-EOF
+INSTANCE_NAME=""
+PROJECT_ROOT=""
+PRIMARY_PLATFORM="linux-desktop"
+ADOPT_EXISTING="false"
+NO_REFRESH="false"
+GIT_BOOTSTRAP="true"
+CREATE_REMOTE="false"
+DRY_RUN="false"
 
-if [ ! -f "$RUNTIME_DIR/MODE_STATE.yaml" ]; then
-cat > "$RUNTIME_DIR/MODE_STATE.yaml" <<'EOF'
-mode: advisor
-requires_confirmation_for_critical: true
-auto_log_actions: true
-auto_snapshot_touched_files: true
-allow_package_changes: false
-allow_service_changes: false
-allow_network_changes: false
-allow_boot_changes: false
-EOF
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --path)
+      PROJECT_ROOT="$2"
+      shift 2
+      ;;
+    --platform)
+      PRIMARY_PLATFORM="$2"
+      shift 2
+      ;;
+    --adopt-existing)
+      ADOPT_EXISTING="true"
+      shift
+      ;;
+    --no-refresh)
+      NO_REFRESH="true"
+      shift
+      ;;
+    --no-git-bootstrap)
+      GIT_BOOTSTRAP="false"
+      shift
+      ;;
+    --create-remote)
+      CREATE_REMOTE="true"
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      if [ -z "$INSTANCE_NAME" ]; then
+        INSTANCE_NAME="$1"
+        shift
+      else
+        die "unexpected argument: $1"
+      fi
+      ;;
+  esac
+done
+
+[ -n "$INSTANCE_NAME" ] || die "instance name is required"
+
+if [ -z "$PROJECT_ROOT" ]; then
+  PROJECT_ROOT="$(resolve_project_arg "$INSTANCE_NAME")"
+else
+  PROJECT_ROOT="$(realpath_safe "$PROJECT_ROOT")"
 fi
 
-if [ ! -f "$INST_DIR/inventory/hosts.yaml" ]; then
-cat > "$INST_DIR/inventory/hosts.yaml" <<'EOF'
-devices:
-  - name: local-workstation
-    type: linux-desktop
-    host: localhost
-  # Example Remote Server
-  # - name: core-server
-  #   type: linux-server
-  #   host: 192.168.1.10
-  #   user: root
-  #   port: 22
-  # Example Firewall
-  # - name: edge-fw
-  #   type: opnsense-firewall
-  #   host: 192.168.1.1
-  #   user: admin
-  # Example Switch
-  # - name: core-switch
-  #   type: network-switch
-  #   host: 192.168.1.2
-  #   user: admin
-EOF
+ensure_project_outside_template "$PROJECT_ROOT"
+
+ADOPTION_MODE="false"
+if [ -d "$PROJECT_ROOT" ] && [ -n "$(find "$PROJECT_ROOT" -mindepth 1 -maxdepth 1 2>/dev/null | head -n 1)" ] && [ ! -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ]; then
+  if [ "$ADOPT_EXISTING" != "true" ]; then
+    die "project path exists but does not look like a SACST project repo: $PROJECT_ROOT (use --adopt-existing to migrate it in place)"
+  fi
+  ADOPTION_MODE="true"
 fi
 
-if [ ! -f "$RUNTIME_DIR/PERMISSIONS_EFFECTIVE.yaml" ]; then
-cat > "$RUNTIME_DIR/PERMISSIONS_EFFECTIVE.yaml" <<'EOF'
-read_scope:
-  - /
-write_scope:
-  - $HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE
-command_scope:
-  - inspect
-  - audit
-  - report
-prohibited_actions:
-  - partition_without_explicit_task
-  - cryptsetup_change_without_explicit_task
-  - firewall_change_without_explicit_task
-critical_action_classes:
-  - bootloader
-  - initramfs
-  - kernel
-  - disk
-  - crypto
-  - firewall
-  - network
-  - pam
-  - ssh_auth
-  - gpu_driver
-  - core_service
-repo_precedence_required: true
-EOF
+if [ "$DRY_RUN" = "true" ]; then
+  echo "DRY RUN: instance=$INSTANCE_NAME"
+  echo "DRY RUN: project_root=$PROJECT_ROOT"
+  echo "DRY RUN: platform=$PRIMARY_PLATFORM"
+  echo "DRY RUN: adopt_existing=$ADOPTION_MODE"
+  echo "DRY RUN: create_remote=$CREATE_REMOTE"
+  if [ "$ADOPTION_MODE" = "true" ]; then
+    echo "DRY RUN: template-managed paths that would be backed up/replaced:"
+    template_managed_paths
+    echo "DRY RUN: legacy control surfaces that would be archived:"
+    printf '%s\n' control/AGENTS.md control/GEMINI.md control/CLAUDE.md control/.github control/.cursor
+  fi
+  exit 0
 fi
 
-: > "$LOG_DIR/actions.jsonl"
-: > "$LOG_DIR/critical-actions.jsonl"
-: > "$LOG_DIR/sessions.jsonl"
-: > "$LOG_DIR/feedback.jsonl"
-: > "$LOG_DIR/learn-events.jsonl"
+CREATED_AT_UTC="$(timestamp_utc)"
+VERSION="$(template_version)"
+IMPORT_ROOT=""
 
-echo "# Current mission" > "$RUNTIME_DIR/CURRENT_MISSION.md"
-echo "# Current plan" > "$RUNTIME_DIR/CURRENT_PLAN.md"
-echo "# Next actions" > "$RUNTIME_DIR/NEXT_ACTIONS.md"
-echo "Last refresh: $TS" > "$RUNTIME_DIR/LAST_REFRESH.md"
+ensure_project_dirs "$PROJECT_ROOT"
+copy_initial_templates "$PROJECT_ROOT" "$INSTANCE_NAME" "$PRIMARY_PLATFORM" "$CREATED_AT_UTC" "$VERSION"
 
-if [ ! -d "$ROOT/.git" ]; then
-  git -C "$ROOT" init >/dev/null 2>&1 || true
+if [ "$ADOPTION_MODE" = "true" ]; then
+  IMPORT_ROOT="$PROJECT_ROOT/state/imports/$(timestamp_compact)"
+  mkdir -p "$IMPORT_ROOT"
+  while IFS= read -r managed; do
+    [ -n "$managed" ] || continue
+    backup_path_if_exists "$PROJECT_ROOT" "$IMPORT_ROOT" "$managed"
+  done < <(template_managed_paths)
+  for legacy in control/AGENTS.md control/GEMINI.md control/CLAUDE.md control/.github control/.cursor; do
+    move_path_to_import_if_exists "$PROJECT_ROOT" "$IMPORT_ROOT/legacy-control" "$legacy"
+  done
 fi
 
-echo "Sys-Agent Core initialized for instance: $INSTANCE"
-echo "Raw audit captured at: $RAW_DIR"
-echo "Next step: normalize raw audit into context/normalized and generate control adapter files."
+render_project_template_subset "$PROJECT_ROOT" "$INSTANCE_NAME" "$PRIMARY_PLATFORM" "$CREATED_AT_UTC" "$VERSION" "$ADOPTION_MODE"
+ensure_project_owned_defaults "$PROJECT_ROOT"
+upgrade_runtime_contracts "$PROJECT_ROOT"
+
+touch "$PROJECT_ROOT/logs/actions.jsonl"
+touch "$PROJECT_ROOT/logs/critical-actions.jsonl"
+touch "$PROJECT_ROOT/logs/feedback.jsonl"
+touch "$PROJECT_ROOT/logs/sessions.jsonl"
+
+mkdir -p "$PROJECT_ROOT/reports/history" "$PROJECT_ROOT/reports/latest"
+[ -f "$PROJECT_ROOT/runtime/CURRENT_MISSION.md" ] || printf "# Current mission\n" > "$PROJECT_ROOT/runtime/CURRENT_MISSION.md"
+[ -f "$PROJECT_ROOT/runtime/CURRENT_PLAN.md" ] || printf "# Current plan\n" > "$PROJECT_ROOT/runtime/CURRENT_PLAN.md"
+[ -f "$PROJECT_ROOT/runtime/NEXT_ACTIONS.md" ] || printf "# Next actions\n" > "$PROJECT_ROOT/runtime/NEXT_ACTIONS.md"
+
+"$SYS_AGENT_ROOT/bin/sys-generate-adapters" "$PROJECT_ROOT"
+
+if [ "$ADOPTION_MODE" = "true" ]; then
+  "$SYS_AGENT_ROOT/bin/sys-reconcile-project" "$PROJECT_ROOT" >/dev/null
+  write_adoption_report "$PROJECT_ROOT" "$IMPORT_ROOT"
+  migrate_legacy_logs_if_needed "$PROJECT_ROOT" "$IMPORT_ROOT"
+fi
+
+if [ "$GIT_BOOTSTRAP" = "true" ]; then
+  GIT_ARGS=( "$PROJECT_ROOT" )
+  [ "$CREATE_REMOTE" = "true" ] && GIT_ARGS+=( --create-remote )
+  "$SYS_AGENT_ROOT/bin/sys-git-bootstrap" "${GIT_ARGS[@]}" >/dev/null
+fi
+
+if [ "$NO_REFRESH" = "false" ]; then
+  "$SYS_AGENT_ROOT/bin/sys-refresh" "$PROJECT_ROOT"
+fi
+
+echo "Initialized SACST project repo: $PROJECT_ROOT"

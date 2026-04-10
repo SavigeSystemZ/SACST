@@ -1,21 +1,40 @@
-# Sys-Agent Core - Architecture
+# SACST Architecture
 
-## Control-Plane Model
-The system operates as a file-based control plane, utilizing a set of canonical Markdown and YAML files to dictate policy, record state, track actions, and manage infrastructure inventory. 
+## Canonical Layout
 
-## Module Boundaries
-1. **Framework (`/framework/`):** The global, portable meta-system containing canonical rules, schemas, templates, and the supervised learning loop.
-2. **Instances (`/instances/`):** Machine or environment-specific configurations housing the current state of truth derived from raw audits of local and remote devices.
-3. **Inventory (`/instances/<name>/inventory/`):** The fleet definition containing connection details, roles, and credentials (referenced securely) for Linux servers, OPNsense firewalls, and network switches.
-4. **Adapters (`/instances/<name>/control/`):** Thin, tool-native entry points (e.g., `AGENTS.md`, `GEMINI.md`) that point back to the framework's canonical truth.
+- Repo root is the only canonical framework location.
+- `canonical/` contains durable policy and architecture.
+- `schemas/` contains machine-readable contracts.
+- `templates/instance/` contains the tracked scaffold for project repos.
+- `adapters/` contains shared adapter inputs and generation surfaces.
+- `platforms/` contains platform-specific collection, normalization, validation, backup, and risk guidance for Linux, Windows, OPNsense, switches, and future vendor modules.
+- `meta/` contains template governance and compatibility state.
+- `tests/` and `examples/` contain synthetic fixtures and golden outputs.
 
-## Precedence Model
-1. Repo-Local Instructions (`.cursor/rules`, local `AGENTS.md`)
-2. Sys-Agent Core Framework Policy
-3. Sys-Agent Core Instance Truth & Inventory Constraints
-4. Session State
+## Runtime Split
 
-## Learning Loop Architecture
-1. **Feedback Capture:** Session outcomes and explicit user feedback are logged.
-2. **Candidate Generation:** Successful patterns are isolated into `candidates/`.
-3. **Promotion Gate:** Supervised review required before a candidate modifies canonical templates.
+- SACST stores template artifacts only.
+- Project repos live outside SACST and are self-contained.
+- Project repos track curated truth but not volatile runtime, raw audit, logs, or checkpoints.
+- Project repos own credential references, security-testing scope, and vendor research notes; SACST owns only the reusable policies, templates, schemas, and helpers for those surfaces.
+- Unknown vendors and device classes use the `generic-vendor` fallback until a sanitized platform module is promoted.
+
+## Control-Plane Lifecycle
+
+1. Scaffold a project repo from the template.
+2. Collect raw audit data into the project repo.
+3. Normalize raw data into stable context.
+4. Generate tool-specific adapters from canonical truth.
+5. Research unfamiliar vendor or OS command syntax when policy requires it.
+6. Create a platform plan for unmodeled vendors before mutation.
+7. Run operations through plan, preflight, apply, validate, and rollback-ready workflows.
+8. Promote reusable improvements back into SACST only through the meta-system.
+
+## Precedence
+
+1. Target repo local instructions
+2. Project repo local instructions
+3. SACST-generated adapters
+4. SACST canonical policy
+5. Project normalized truth
+6. Runtime state

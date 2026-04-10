@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+[ $# -eq 1 ] || { echo "Usage: sys-conflict-scan <target-repo-path>" >&2; exit 1; }
+
+TARGET="$1"
+[ -d "$TARGET" ] || { echo "Error: target path is not a directory: $TARGET" >&2; exit 1; }
+
+find "$TARGET" -maxdepth 3 \( \
+  -name AGENTS.md -o \
+  -name GEMINI.md -o \
+  -name CLAUDE.md -o \
+  -path '*/.cursor/rules/*' -o \
+  -path '*/.github/copilot-instructions.md' -o \
+  -path '*/.github/instructions/*' \
+\) | sort

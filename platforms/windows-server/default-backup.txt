@@ -1,0 +1,2 @@
+# This is a lightweight state snapshot, not a full Windows Server backup.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ComputerInfo | Select-Object CsName,WindowsProductName,WindowsVersion,OsArchitecture | ConvertTo-Json -Compress"

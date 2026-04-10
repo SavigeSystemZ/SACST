@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: sys-research-plan <project-path|instance-name> --topic <topic> [--vendor <vendor>] [--platform <platform>] [--device <device>] [--intent <intent>] [--dry-run]
+
+Creates a project-local research note scaffold for vendor, OS, appliance, Windows,
+Linux, or security-tool command research. Do not include secrets in topics or notes.
+EOF
+}
+
+[ $# -ge 3 ] || { usage; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+shift
+TOPIC=""
+VENDOR=""
+PLATFORM=""
+DEVICE=""
+INTENT=""
+DRY_RUN="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --topic)
+      TOPIC="$2"
+      shift 2
+      ;;
+    --vendor)
+      VENDOR="$2"
+      shift 2
+      ;;
+    --platform)
+      PLATFORM="$2"
+      shift 2
+      ;;
+    --device)
+      DEVICE="$2"
+      shift 2
+      ;;
+    --intent)
+      INTENT="$2"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unexpected argument: $1"
+      ;;
+  esac
+done
+
+[ -n "$TOPIC" ] || die "--topic is required"
+[ -f "$PROJECT_ROOT/control/RESEARCH_POLICY.yaml" ] || die "missing project research policy: $PROJECT_ROOT/control/RESEARCH_POLICY.yaml"
+
+STAMP="$(timestamp_compact)"
+NOTES_DIR="$(yaml_scalar "$PROJECT_ROOT/control/RESEARCH_POLICY.yaml" notes_dir 2>/dev/null || true)"
+[ -n "$NOTES_DIR" ] || NOTES_DIR="research/notes"
+OUTPUT_PATH="$PROJECT_ROOT/$NOTES_DIR/RESEARCH_$STAMP.md"
+
+python3 - "$PROJECT_ROOT/control/RESEARCH_POLICY.yaml" "$OUTPUT_PATH" "$TOPIC" "$VENDOR" "$PLATFORM" "$DEVICE" "$INTENT" "$DRY_RUN" <<'PY'
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+import yaml
+
+policy_file, output_path, topic, vendor, platform, device, intent, dry_run = sys.argv[1:]
+
+with open(policy_file, "r", encoding="utf-8") as fh:
+    policy = yaml.safe_load(fh) or {}
+
+blocked_terms = [str(item) for item in policy.get("prohibited_query_content", [])]
+triggers = [str(item) for item in policy.get("require_research_when", [])]
+prefer_primary = bool(policy.get("prefer_primary_sources", True))
+allowed = bool(policy.get("live_research_allowed", False))
+ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+lines = [
+    "# Research Plan",
+    "",
+    f"- generated_at_utc: {ts}",
+    f"- topic: {topic}",
+    f"- vendor: {vendor or 'unknown'}",
+    f"- platform: {platform or 'unknown'}",
+    f"- device: {device or 'unknown'}",
+    f"- intent: {intent or 'unknown'}",
+    f"- live_research_allowed: {str(allowed).lower()}",
+    f"- prefer_primary_sources: {str(prefer_primary).lower()}",
+    "",
+    "## Boundary",
+    "",
+    "- Do not include raw credentials, private keys, tokens, private full configs, or confidential topology in search queries or notes.",
+    "- Keep project-specific research in this project repo only; do not copy it into SACST.",
+    "- Prefer vendor documentation, official man pages, upstream project docs, and primary references.",
+    "- Treat researched commands as untrusted until reviewed against target platform/version and project scope.",
+    "",
+    "## Research Triggers",
+    "",
+]
+
+for trigger in triggers:
+    lines.append(f"- {trigger}")
+
+lines.extend([
+    "",
+    "## Prohibited Query Content",
+    "",
+])
+
+for term in blocked_terms:
+    lines.append(f"- {term}")
+
+lines.extend([
+    "",
+    "## Source Ledger",
+    "",
+    "| Source | Type | Version/Date | Relevance | Confidence | Notes |",
+    "| --- | --- | --- | --- | --- | --- |",
+    "|  |  |  |  |  |  |",
+    "",
+    "## Candidate Commands",
+    "",
+    "| Command | Source | Risk Class | Preconditions | Validation | Rollback | Decision |",
+    "| --- | --- | --- | --- | --- | --- | --- |",
+    "|  |  |  |  |  |  |  |",
+    "",
+    "## Execution Gate",
+    "",
+    "- Confirm project scope and authorization before security testing.",
+    "- Run preflight for non-inspect or critical action classes.",
+    "- Capture backups/checkpoints before mutation.",
+    "- Validate immediately and schedule delayed rechecks where state persistence matters.",
+    "- Log the final action, result, source references, and rollback reference.",
+    "",
+    "## Open Questions",
+    "",
+    "- ",
+    "",
+])
+
+content = "\n".join(lines)
+if dry_run == "true":
+    print(content)
+else:
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    print(path)
+PY

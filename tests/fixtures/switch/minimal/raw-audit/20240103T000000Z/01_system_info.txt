@@ -1,0 +1,8 @@
+# collected_at_utc=20240103T000000Z
+# host=core-sw1
+# command=show version
+
+hostname=core-sw1
+model=CBS350-24T-4G
+software_version=3.4.0.17
+serial=ABC123XYZ

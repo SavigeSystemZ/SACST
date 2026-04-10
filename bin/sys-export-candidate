@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+[ $# -ge 3 ] || { echo "Usage: sys-export-candidate <project-path|instance-name> <candidate-id> <summary...>" >&2; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+CANDIDATE_ID="$2"
+shift 2
+SUMMARY="$*"
+
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+OUT_DIR="$PROJECT_ROOT/state/exports/candidates"
+OUT_FILE="$OUT_DIR/$CANDIDATE_ID.md"
+mkdir -p "$OUT_DIR"
+
+cat > "$OUT_FILE" <<EOF
+# Learning Candidate: $CANDIDATE_ID
+
+- exported_at_utc: $(timestamp_utc)
+- source_project: $(project_instance "$PROJECT_ROOT")
+- template_version: $(yaml_scalar "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" template_version)
+
+## Summary
+
+$SUMMARY
+EOF
+
+echo "$OUT_FILE"

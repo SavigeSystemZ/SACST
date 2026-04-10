@@ -1,0 +1,8 @@
+# collected_at_utc=2024-01-04T00:00:00Z
+# host=windows-fixture
+# transport=fixture
+
+DisplayName             DisplayVersion Publisher
+-----------             -------------- ---------
+PowerShell 7-x64        7.4.0          Microsoft Corporation
+OpenSSH Client          9.5            Microsoft Corporation

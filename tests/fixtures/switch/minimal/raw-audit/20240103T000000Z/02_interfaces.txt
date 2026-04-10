@@ -1,0 +1,4 @@
+Gi1/0/1 connected trunk 1G
+Gi1/0/2 connected access vlan 10 1G
+Gi1/0/3 notconnect access vlan 20 1G
+Gi1/0/24 connected uplink vlan trunk 1G

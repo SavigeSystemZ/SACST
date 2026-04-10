@@ -1,0 +1,5 @@
+Routing tables
+
+Internet:
+default            203.0.113.1        UGS         igc1
+192.168.10.0/24    link#1             U           igc0

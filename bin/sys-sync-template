@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+DRY_RUN="false"
+WRITE_REPORT="false"
+PROJECT_ROOT=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    --report)
+      WRITE_REPORT="true"
+      shift
+      ;;
+    *)
+      if [ -z "$PROJECT_ROOT" ]; then
+        PROJECT_ROOT="$(resolve_project_arg "$1")"
+        shift
+      else
+        die "unexpected argument: $1"
+      fi
+      ;;
+  esac
+done
+
+[ -n "$PROJECT_ROOT" ] || { echo "Usage: sys-sync-template <project-path|instance-name> [--dry-run] [--report]" >&2; exit 1; }
+
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+INSTANCE_ID="$(project_instance "$PROJECT_ROOT")"
+PLATFORM="$(project_platform "$PROJECT_ROOT")"
+CREATED_AT="$(project_created_at "$PROJECT_ROOT")"
+VERSION="$(template_version)"
+SYNC_STAMP="$(timestamp_compact)"
+BACKUP_DIR="$PROJECT_ROOT/state/diffs/template-sync-$SYNC_STAMP"
+REPORT_FILE="$PROJECT_ROOT/reports/latest/TEMPLATE_SYNC_REPORT_$SYNC_STAMP.md"
+
+if [ "$DRY_RUN" = "true" ]; then
+  echo "DRY RUN: sync project_root=$PROJECT_ROOT"
+  echo "DRY RUN: backup_dir=$BACKUP_DIR"
+  echo "DRY RUN: managed paths:"
+  template_managed_paths
+  exit 0
+fi
+
+mkdir -p "$BACKUP_DIR" "$PROJECT_ROOT/reports/latest"
+
+while IFS= read -r tracked; do
+  [ -n "$tracked" ] || continue
+  backup_path_if_exists "$PROJECT_ROOT" "$BACKUP_DIR" "$tracked"
+done < <(template_managed_paths)
+
+render_project_template_subset "$PROJECT_ROOT" "$INSTANCE_ID" "$PLATFORM" "$CREATED_AT" "$VERSION" true
+refresh_project_profile_version "$PROJECT_ROOT"
+"$SYS_AGENT_ROOT/bin/sys-generate-adapters" "$PROJECT_ROOT"
+
+if [ "$WRITE_REPORT" = "true" ]; then
+  {
+    echo "# Template Sync Report"
+    echo
+    echo "- generated_at_utc: $(timestamp_utc)"
+    echo "- backup_dir: $BACKUP_DIR"
+    echo
+    echo "## Managed Paths"
+    while IFS= read -r tracked; do
+      [ -n "$tracked" ] || continue
+      echo "- $tracked"
+    done < <(template_managed_paths)
+  } > "$REPORT_FILE"
+fi
+
+echo "Synced template-managed files into $PROJECT_ROOT"
+echo "Backups stored in $BACKUP_DIR"
+if [ "$WRITE_REPORT" = "true" ]; then
+  echo "Report written to $REPORT_FILE"
+fi

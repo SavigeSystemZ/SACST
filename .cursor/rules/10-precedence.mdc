@@ -1,0 +1,8 @@
+---
+description: "SACST precedence and repo pivot rules"
+globs: ["**/*"]
+---
+
+- Read `AGENTS.md` first when working on SACST.
+- Keep canonical docs, schemas, templates, and adapters consistent.
+- If work later moves into another repository, that repo's local instruction surfaces take precedence for edits there.

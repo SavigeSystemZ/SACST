@@ -1,6 +1,21 @@
 $schema: "http://json-schema.org/draft-07/schema#"
+title: "Feedback Event"
 type: object
+required:
+  - schema_version
+  - ts
+  - session_id
+  - user_signal
 properties:
-  ts: { type: string }
-  session_id: { type: string }
-  user_signal: { type: string, enum: [liked, disliked, neutral] }
+  schema_version:
+    type: integer
+    const: 1
+  ts:
+    type: string
+  session_id:
+    type: string
+  user_signal:
+    type: string
+    enum: [liked, disliked, neutral]
+  notes:
+    type: string

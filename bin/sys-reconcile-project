@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: sys-reconcile-project <project-path|instance-name> [--report]
+EOF
+}
+
+[ $# -ge 1 ] || { usage; exit 1; }
+
+PROJECT_ROOT=""
+WRITE_REPORT="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --report)
+      WRITE_REPORT="true"
+      shift
+      ;;
+    *)
+      if [ -z "$PROJECT_ROOT" ]; then
+        PROJECT_ROOT="$(resolve_project_arg "$1")"
+        shift
+      else
+        die "unexpected argument: $1"
+      fi
+      ;;
+  esac
+done
+
+[ -n "$PROJECT_ROOT" ] || die "project path is required"
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+LAST_REFRESH="$(yaml_scalar "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" last_refresh_utc 2>/dev/null || true)"
+TTL="$(freshness_ttl_hours "$PROJECT_ROOT")"
+FRESHNESS="$(freshness_status_from_last_refresh "${LAST_REFRESH:-}" "$TTL")"
+STAMP="$(timestamp_compact)"
+GENERATED_AT="$(timestamp_utc)"
+REPORT_FILE=""
+RECONCILED_ITEMS=()
+
+write_manifest_files() {
+  local normalized_dir="$1"
+  local platform="$2"
+  local device_name="${3:-}"
+  local manifest_file="$normalized_dir/NORMALIZATION_MANIFEST.yaml"
+  local freshness_file="$normalized_dir/FRESHNESS_STATE.yaml"
+  local outputs=()
+
+  while read -r path; do
+    [ -n "$path" ] || continue
+    outputs+=( "$path" )
+  done < <(find "$normalized_dir" -mindepth 1 -maxdepth 1 -type f ! -name NORMALIZATION_MANIFEST.yaml ! -name FRESHNESS_STATE.yaml | sort)
+
+  cat > "$freshness_file" <<EOF
+schema_version: 1
+generated_at_utc: "$GENERATED_AT"
+normalized_context_ttl_hours: $TTL
+status: $FRESHNESS
+EOF
+
+  {
+    echo 'schema_version: 1'
+    echo "generated_at_utc: \"$GENERATED_AT\""
+    echo "source_raw_audit_dir: \"$(yaml_scalar "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" latest_raw_audit_dir 2>/dev/null || true)\""
+    echo "platform_family: \"$platform\""
+    echo "target_device_name: \"${device_name}\""
+    echo 'outputs:'
+    for output_path in "${outputs[@]}" "$freshness_file"; do
+      echo "  - $output_path"
+    done
+  } > "$manifest_file"
+}
+
+ROOT_NORMALIZED="$PROJECT_ROOT/context/normalized"
+if [ -d "$ROOT_NORMALIZED" ] && find "$ROOT_NORMALIZED" -mindepth 1 -maxdepth 1 -type f -name '*.md' 2>/dev/null | grep -q .; then
+  write_manifest_files "$ROOT_NORMALIZED" "$(project_platform "$PROJECT_ROOT")"
+  RECONCILED_ITEMS+=( "root-normalized" )
+  write_runtime_state \
+    "$PROJECT_ROOT" \
+    "$LAST_REFRESH" \
+    "$(yaml_scalar "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" latest_raw_audit_dir 2>/dev/null || true)" \
+    "$ROOT_NORMALIZED/NORMALIZATION_MANIFEST.yaml" \
+    "$FRESHNESS"
+fi
+
+while read -r device_dir; do
+  [ -n "$device_dir" ] || continue
+  DEVICE_NAME="$(basename "$device_dir")"
+  DEVICE_PLATFORM="$(project_device_field "$PROJECT_ROOT" "$DEVICE_NAME" platform_family)"
+  [ -n "$DEVICE_PLATFORM" ] || DEVICE_PLATFORM="other"
+  if find "$device_dir" -mindepth 1 -maxdepth 1 -type f -name '*.md' 2>/dev/null | grep -q .; then
+    write_manifest_files "$device_dir" "$DEVICE_PLATFORM" "$DEVICE_NAME"
+    write_device_state "$PROJECT_ROOT" "$DEVICE_NAME" "$DEVICE_PLATFORM" "${LAST_REFRESH:-$GENERATED_AT}" "reconciled"
+    RECONCILED_ITEMS+=( "device:$DEVICE_NAME" )
+  fi
+done < <(find "$PROJECT_ROOT/context/normalized/devices" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
+
+if [ "$WRITE_REPORT" = "true" ]; then
+  REPORT_FILE="$PROJECT_ROOT/reports/latest/RECONCILE_REPORT_$STAMP.md"
+  {
+    echo "# Reconcile Report"
+    echo
+    echo "- generated_at_utc: $GENERATED_AT"
+    echo "- project_root: $PROJECT_ROOT"
+    echo "- last_refresh_utc: ${LAST_REFRESH:-unknown}"
+    echo "- freshness_status: $FRESHNESS"
+    echo
+    echo "## Reconciled Items"
+    if [ "${#RECONCILED_ITEMS[@]}" -eq 0 ]; then
+      echo "- none"
+    else
+      for item in "${RECONCILED_ITEMS[@]}"; do
+        echo "- $item"
+      done
+    fi
+  } > "$REPORT_FILE"
+fi
+
+echo "Reconciled project runtime artifacts: $PROJECT_ROOT"
+if [ "${#RECONCILED_ITEMS[@]}" -gt 0 ]; then
+  printf '%s\n' "${RECONCILED_ITEMS[@]}"
+fi
+if [ "$WRITE_REPORT" = "true" ]; then
+  echo "Report written to $REPORT_FILE"
+fi

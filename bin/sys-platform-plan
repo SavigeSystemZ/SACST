@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: sys-platform-plan <project-path|instance-name> --vendor <vendor> --device-class <class> --intent <intent> [--model <model>] [--access-method <method>] [--dry-run]
+
+Creates a project-local platform work plan for unmodeled or vendor-specific IT systems.
+Use this before operating on equipment that does not already have a SACST platform module.
+EOF
+}
+
+[ $# -ge 7 ] || { usage; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+shift
+
+VENDOR=""
+DEVICE_CLASS=""
+MODEL=""
+ACCESS_METHOD=""
+INTENT=""
+DRY_RUN="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --vendor)
+      VENDOR="$2"
+      shift 2
+      ;;
+    --device-class)
+      DEVICE_CLASS="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --access-method)
+      ACCESS_METHOD="$2"
+      shift 2
+      ;;
+    --intent)
+      INTENT="$2"
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unexpected argument: $1"
+      ;;
+  esac
+done
+
+[ -n "$VENDOR" ] || die "--vendor is required"
+[ -n "$DEVICE_CLASS" ] || die "--device-class is required"
+[ -n "$INTENT" ] || die "--intent is required"
+[ -f "$PROJECT_ROOT/control/RESEARCH_POLICY.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+STAMP="$(timestamp_compact)"
+NOTES_DIR="$(yaml_scalar "$PROJECT_ROOT/control/RESEARCH_POLICY.yaml" notes_dir 2>/dev/null || true)"
+[ -n "$NOTES_DIR" ] || NOTES_DIR="research/notes"
+OUTPUT_PATH="$PROJECT_ROOT/$NOTES_DIR/PLATFORM_PLAN_$STAMP.md"
+
+python3 - "$OUTPUT_PATH" "$VENDOR" "$DEVICE_CLASS" "$MODEL" "$ACCESS_METHOD" "$INTENT" "$DRY_RUN" <<'PY'
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+output_path, vendor, device_class, model, access_method, intent, dry_run = sys.argv[1:]
+ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+content = f"""# Vendor / Platform Work Plan
+
+- generated_at_utc: {ts}
+- vendor: {vendor}
+- device_class: {device_class}
+- model_or_family: {model or "unknown"}
+- access_method: {access_method or "unknown"}
+- intent: {intent}
+
+## Required Research
+
+- Use live research when command syntax, access method, firmware behavior, or management-plane behavior is unfamiliar or version-sensitive.
+- Prefer vendor documentation, official manuals, release notes, security advisories, and primary sources.
+- Record source URL/title, version or firmware target, date accessed, and confidence before running sourced commands.
+- Do not paste private configs, full topology, credentials, tokens, serials, or sensitive findings into search queries.
+
+## Credential and Default-Credential Boundary
+
+- Do not store raw credentials in this repo or SACST.
+- Treat vendor default credentials as a risk signal, not an operating credential.
+- If a vendor default credential is relevant, verify it from an official source, use it only with explicit authorization, and plan immediate rotation or disablement.
+- Store only credential references such as `ssh-agent:...`, `pass:...`, `1password:...`, `env:...`, or operator-held session notes.
+
+## Access Plan
+
+- Identify management interface, management zone, bastion/jump path, and out-of-band fallback.
+- Confirm read-only commands before mutation.
+- Define timeout, recheck interval, and session persistence requirements.
+- Preserve one known-good management path before firewall, routing, auth, or firmware changes.
+
+## Command Plan
+
+| Purpose | Candidate command | Source | Risk class | Preconditions | Dry-run/check variant | Decision |
+| --- | --- | --- | --- | --- | --- | --- |
+| Inspect |  |  | inspect |  |  |  |
+| Backup |  |  | critical |  |  |  |
+| Validate |  |  | inspect |  |  |  |
+| Apply |  |  | critical |  |  |  |
+| Rollback |  |  | critical |  |  |  |
+
+## Security Scope Gate
+
+- Default posture is defensive review and hardening only.
+- Run `bin/sys-scope-check <project> --activity <activity>` before security assessment activity.
+- Broader testing requires `control/SECURITY_SCOPE.yaml` with `authorized_security_testing: true`, `rules_of_engagement_ref`, and `approval_ref`.
+
+## Validation and Rollback Gate
+
+- Define pre-change backup or export.
+- Define post-change validation command and management probe.
+- Define delayed recheck count and interval.
+- Define rollback command, restore command, commit-confirmed workflow, snapshot, or manual rollback instructions.
+- Log the final action with rollback references.
+
+## Open Questions
+
+- Exact firmware/software version:
+- Exact management path:
+- Existing backup/export method:
+- Out-of-band recovery path:
+- Maintenance window:
+- Required approvals:
+"""
+
+if dry_run == "true":
+    print(content)
+else:
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    print(path)
+PY

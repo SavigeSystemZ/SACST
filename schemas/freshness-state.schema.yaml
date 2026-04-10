@@ -1,0 +1,19 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Freshness State"
+type: object
+required:
+  - schema_version
+  - generated_at_utc
+  - normalized_context_ttl_hours
+  - status
+properties:
+  schema_version:
+    type: integer
+    const: 1
+  generated_at_utc:
+    type: string
+  normalized_context_ttl_hours:
+    type: integer
+  status:
+    type: string
+    enum: [fresh, stale, unknown]

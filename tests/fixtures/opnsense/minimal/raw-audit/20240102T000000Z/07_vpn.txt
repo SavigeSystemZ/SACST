@@ -1,0 +1,2 @@
+OpenVPN server: disabled
+IPsec: no active tunnels

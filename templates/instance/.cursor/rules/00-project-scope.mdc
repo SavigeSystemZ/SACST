@@ -1,0 +1,10 @@
+---
+description: "Project repo scope rules"
+globs: ["**/*"]
+---
+
+- This repo is an operational control plane for sysadmin/network-admin work.
+- Project-local context belongs here; template changes do not.
+- Project-local research notes, credential references, and security scope belong here.
+- Security testing is defensive-only unless the project scope explicitly allows the activity.
+- Target-repo local instructions still win when operating in another repository.

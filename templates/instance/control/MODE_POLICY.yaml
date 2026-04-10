@@ -1,0 +1,13 @@
+schema_version: 1
+default_mode: advisor
+allowed_modes:
+  - advisor
+  - operator
+  - yolo
+requires_confirmation_for_critical: true
+auto_log_actions: true
+auto_snapshot_touched_files: true
+allow_package_changes: false
+allow_service_changes: false
+allow_network_changes: false
+allow_boot_changes: false

@@ -1,0 +1,20 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Adapter Manifest"
+type: object
+required:
+  - schema_version
+  - generated_at_utc
+  - template_version
+  - outputs
+properties:
+  schema_version:
+    type: integer
+    const: 1
+  generated_at_utc:
+    type: string
+  template_version:
+    type: string
+  outputs:
+    type: array
+    items:
+      type: string

@@ -1,0 +1,4 @@
+1 default active
+10 workstations active
+20 servers active
+30 management active

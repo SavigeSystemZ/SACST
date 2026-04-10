@@ -1,0 +1,8 @@
+# collected_at_utc=2024-01-04T00:00:00Z
+# host=windows-fixture
+# transport=fixture
+
+LocalAddress LocalPort OwningProcess
+------------ --------- -------------
+0.0.0.0      22        1000
+127.0.0.1    5985      2000

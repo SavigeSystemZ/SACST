@@ -1,0 +1,798 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: sys-normalize <project-path|instance-name> [--source <raw-audit-dir>] [--output-dir <normalized-dir>] [--platform <platform>] [--device-name <device-name>]
+EOF
+}
+
+[ $# -ge 1 ] || { usage; exit 1; }
+
+PROJECT_ROOT=""
+SOURCE_DIR=""
+OUTPUT_DIR=""
+PLATFORM_OVERRIDE=""
+DEVICE_NAME=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --source)
+      SOURCE_DIR="$(realpath_safe "$2")"
+      shift 2
+      ;;
+    --output-dir)
+      OUTPUT_DIR="$(realpath_safe "$2")"
+      shift 2
+      ;;
+    --platform)
+      PLATFORM_OVERRIDE="$2"
+      shift 2
+      ;;
+    --device-name)
+      DEVICE_NAME="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      if [ -z "$PROJECT_ROOT" ]; then
+        PROJECT_ROOT="$(resolve_project_arg "$1")"
+        shift
+      else
+        die "unexpected argument: $1"
+      fi
+      ;;
+  esac
+done
+
+[ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+if [ -z "$SOURCE_DIR" ]; then
+  SOURCE_DIR="$(latest_raw_dir "$PROJECT_ROOT")"
+fi
+[ -n "$SOURCE_DIR" ] || die "no raw audit source found"
+
+OUT_DIR="${OUTPUT_DIR:-$PROJECT_ROOT/context/normalized}"
+mkdir -p "$OUT_DIR"
+
+GENERATED_AT="$(timestamp_utc)"
+INSTANCE_ID="$(project_instance "$PROJECT_ROOT")"
+PLATFORM="${PLATFORM_OVERRIDE:-$(project_platform "$PROJECT_ROOT")}"
+
+excerpt() {
+  local file="$1"
+  local lines="${2:-80}"
+  if [ -f "$file" ]; then
+    sed -n "1,${lines}p" "$file" | sed 's/[[:space:]]\+$//'
+  fi
+}
+
+count_lines() {
+  local file="$1"
+  if [ -f "$file" ]; then
+    grep -c '.' "$file" 2>/dev/null || true
+  else
+    echo 0
+  fi
+}
+
+write_manifest_bundle() {
+  local ttl="$1"
+  cat > "$OUT_DIR/FRESHNESS_STATE.yaml" <<EOF
+schema_version: 1
+generated_at_utc: "$GENERATED_AT"
+normalized_context_ttl_hours: $ttl
+status: fresh
+EOF
+
+  cat > "$OUT_DIR/NORMALIZATION_MANIFEST.yaml" <<EOF
+schema_version: 1
+generated_at_utc: "$GENERATED_AT"
+source_raw_audit_dir: "$SOURCE_DIR"
+platform_family: "$PLATFORM"
+target_device_name: "${DEVICE_NAME:-}"
+outputs:
+  - $OUT_DIR/HOST_PROFILE.md
+  - $OUT_DIR/OS_AND_KERNEL.md
+  - $OUT_DIR/HARDWARE.md
+  - $OUT_DIR/STORAGE.md
+  - $OUT_DIR/TOOLCHAIN.md
+  - $OUT_DIR/AI_STACK.md
+  - $OUT_DIR/NETWORK_AND_PORTS.md
+  - $OUT_DIR/SERVICES.md
+  - $OUT_DIR/SECURITY_POSTURE.md
+  - $OUT_DIR/USER_WORKFLOW.md
+  - $OUT_DIR/FRESHNESS_STATE.yaml
+EOF
+}
+
+write_linux_outputs() {
+  local os_file hw_file pkg_file dot_file tools_file svc_file port_file gpu_file net_file
+  os_file="$SOURCE_DIR/01_os_info.txt"
+  hw_file="$SOURCE_DIR/02_hardware_info.txt"
+  pkg_file="$SOURCE_DIR/03_installed_packages.txt"
+  dot_file="$SOURCE_DIR/05_home_dotfiles.txt"
+  tools_file="$SOURCE_DIR/06_dev_tools_and_ai.txt"
+  svc_file="$SOURCE_DIR/07_running_services.txt"
+  port_file="$SOURCE_DIR/08_ports.txt"
+  gpu_file="$SOURCE_DIR/11_gpu.txt"
+  net_file="$SOURCE_DIR/12_network.txt"
+
+  local hostname_value kernel_line os_name os_version arch cpu_count cpu_model memory_total
+  local package_count node_version python_version docker_version ttl
+  hostname_value="$(grep '^# host=' "$os_file" 2>/dev/null | head -n 1 | cut -d= -f2)"
+  kernel_line="$(grep -v '^#' "$os_file" 2>/dev/null | sed '/^$/d' | head -n 1)"
+  os_name="$(grep '^NAME=' "$os_file" 2>/dev/null | head -n 1 | cut -d= -f2 | tr -d '"')"
+  os_version="$(grep '^VERSION=' "$os_file" 2>/dev/null | head -n 1 | cut -d= -f2 | tr -d '"')"
+  arch="$(grep '^Architecture:' "$hw_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  cpu_count="$(grep '^CPU(s):' "$hw_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  cpu_model="$(grep '^Model name:' "$hw_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  memory_total="$(awk '/^Mem:/{print $2; exit}' "$hw_file" 2>/dev/null)"
+  package_count="$(count_lines "$pkg_file")"
+  node_version="$(awk '/^=== NODE ===/{getline; print; exit}' "$tools_file" 2>/dev/null | xargs)"
+  python_version="$(awk '/^=== PYTHON ===/{getline; print; exit}' "$tools_file" 2>/dev/null | xargs)"
+  docker_version="$(awk '/^=== DOCKER ===/{getline; print; exit}' "$tools_file" 2>/dev/null | xargs)"
+
+  cat > "$OUT_DIR/HOST_PROFILE.md" <<EOF
+# Host Profile
+
+- generated_at_utc: $GENERATED_AT
+- source_raw_audit_dir: $SOURCE_DIR
+- instance_id: $INSTANCE_ID
+- platform: $PLATFORM
+- device_name: ${DEVICE_NAME:-primary}
+- hostname: ${hostname_value:-unknown}
+- os_name: ${os_name:-unknown}
+- os_version: ${os_version:-unknown}
+- architecture: ${arch:-unknown}
+- cpu_count: ${cpu_count:-unknown}
+- memory_total: ${memory_total:-unknown}
+EOF
+
+  cat > "$OUT_DIR/OS_AND_KERNEL.md" <<EOF
+# OS and Kernel
+
+- generated_at_utc: $GENERATED_AT
+- kernel: ${kernel_line:-unknown}
+- os_name: ${os_name:-unknown}
+- os_version: ${os_version:-unknown}
+EOF
+
+  cat > "$OUT_DIR/HARDWARE.md" <<EOF
+# Hardware
+
+- generated_at_utc: $GENERATED_AT
+- cpu_model: ${cpu_model:-unknown}
+- cpu_count: ${cpu_count:-unknown}
+- architecture: ${arch:-unknown}
+- memory_total: ${memory_total:-unknown}
+
+## Raw Snapshot
+
+$(excerpt "$hw_file" 40)
+EOF
+
+  cat > "$OUT_DIR/STORAGE.md" <<EOF
+# Storage
+
+- generated_at_utc: $GENERATED_AT
+
+## Block Devices
+
+$(awk 'BEGIN{capture=0} /^NAME/{capture=1} capture {print}' "$hw_file" 2>/dev/null)
+EOF
+
+  cat > "$OUT_DIR/TOOLCHAIN.md" <<EOF
+# Toolchain
+
+- generated_at_utc: $GENERATED_AT
+- node: ${node_version:-unknown}
+- python: ${python_version:-unknown}
+- docker: ${docker_version:-unknown}
+- package_count: ${package_count:-0}
+EOF
+
+  cat > "$OUT_DIR/AI_STACK.md" <<EOF
+# AI Stack
+
+- generated_at_utc: $GENERATED_AT
+
+## Tool Output
+
+$(excerpt "$tools_file" 80)
+
+## GPU
+
+$(excerpt "$gpu_file" 40)
+EOF
+
+  cat > "$OUT_DIR/NETWORK_AND_PORTS.md" <<EOF
+# Network and Ports
+
+- generated_at_utc: $GENERATED_AT
+
+## Interfaces and Routes
+
+$(excerpt "$net_file" 80)
+
+## Listening Ports
+
+$(excerpt "$port_file" 80)
+EOF
+
+  cat > "$OUT_DIR/SERVICES.md" <<EOF
+# Services
+
+- generated_at_utc: $GENERATED_AT
+
+$(excerpt "$svc_file" 80)
+EOF
+
+  cat > "$OUT_DIR/SECURITY_POSTURE.md" <<EOF
+# Security Posture
+
+- generated_at_utc: $GENERATED_AT
+- assessment_scope: baseline from local audit output
+
+## Signals
+
+- ssh_present: $(grep -qi ssh "$svc_file" 2>/dev/null && echo yes || echo no)
+- listening_ports_observed: $(grep -c 'LISTEN' "$port_file" 2>/dev/null || echo 0)
+- credential_state: not evaluated from template baseline collectors
+- firewall_state: not directly inferred by current local collector
+EOF
+
+  cat > "$OUT_DIR/USER_WORKFLOW.md" <<EOF
+# User Workflow
+
+- generated_at_utc: $GENERATED_AT
+
+## Dotfiles
+
+$(excerpt "$dot_file" 40)
+
+## Developer and AI Tools
+
+$(excerpt "$tools_file" 80)
+EOF
+
+  ttl="$(freshness_ttl_hours "$PROJECT_ROOT")"
+  write_manifest_bundle "$ttl"
+}
+
+write_opnsense_outputs() {
+  local sys_file if_file svc_file rule_file route_file alias_file vpn_file
+  sys_file="$SOURCE_DIR/01_system_info.txt"
+  if_file="$SOURCE_DIR/02_interfaces.txt"
+  svc_file="$SOURCE_DIR/03_services.txt"
+  rule_file="$SOURCE_DIR/04_firewall_rules.txt"
+  route_file="$SOURCE_DIR/05_routes.txt"
+  alias_file="$SOURCE_DIR/06_aliases.txt"
+  vpn_file="$SOURCE_DIR/07_vpn.txt"
+
+  local hostname_value kernel os_version model ttl
+  hostname_value="$(grep '^hostname=' "$sys_file" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+  kernel="$(grep '^kernel=' "$sys_file" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+  os_version="$(awk '/^OPNsense /{print $2; exit}' "$sys_file" 2>/dev/null)"
+  model="$(grep '^model=' "$sys_file" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+
+  cat > "$OUT_DIR/HOST_PROFILE.md" <<EOF
+# Host Profile
+
+- generated_at_utc: $GENERATED_AT
+- source_raw_audit_dir: $SOURCE_DIR
+- instance_id: $INSTANCE_ID
+- platform: $PLATFORM
+- device_name: ${DEVICE_NAME:-primary}
+- hostname: ${hostname_value:-unknown}
+- os_name: OPNsense
+- os_version: ${os_version:-unknown}
+- hardware_model: ${model:-unknown}
+EOF
+
+  cat > "$OUT_DIR/OS_AND_KERNEL.md" <<EOF
+# OS and Kernel
+
+- generated_at_utc: $GENERATED_AT
+- kernel: ${kernel:-unknown}
+- os_name: OPNsense
+- os_version: ${os_version:-unknown}
+
+## Raw Snapshot
+
+$(excerpt "$sys_file" 40)
+EOF
+
+  cat > "$OUT_DIR/HARDWARE.md" <<EOF
+# Hardware
+
+- generated_at_utc: $GENERATED_AT
+- model: ${model:-unknown}
+
+## Interfaces Snapshot
+
+$(excerpt "$if_file" 80)
+EOF
+
+  cat > "$OUT_DIR/STORAGE.md" <<EOF
+# Storage
+
+- generated_at_utc: $GENERATED_AT
+- note: storage inventory is not collected by the default OPNsense audit profile
+EOF
+
+  cat > "$OUT_DIR/TOOLCHAIN.md" <<EOF
+# Toolchain
+
+- generated_at_utc: $GENERATED_AT
+- note: appliance toolchain inventory is not applicable to the default OPNsense profile
+EOF
+
+  cat > "$OUT_DIR/AI_STACK.md" <<EOF
+# AI Stack
+
+- generated_at_utc: $GENERATED_AT
+- note: AI tooling is not evaluated for OPNsense appliance profiles
+EOF
+
+  cat > "$OUT_DIR/NETWORK_AND_PORTS.md" <<EOF
+# Network and Ports
+
+- generated_at_utc: $GENERATED_AT
+- interface_count: $(grep -c '^[a-z]' "$if_file" 2>/dev/null || echo 0)
+- firewall_rule_count: $(count_lines "$rule_file")
+
+## Interfaces
+
+$(excerpt "$if_file" 80)
+
+## Routes
+
+$(excerpt "$route_file" 60)
+
+## Firewall Rules
+
+$(excerpt "$rule_file" 80)
+EOF
+
+  cat > "$OUT_DIR/SERVICES.md" <<EOF
+# Services
+
+- generated_at_utc: $GENERATED_AT
+- observed_services: $(count_lines "$svc_file")
+
+## Service Snapshot
+
+$(excerpt "$svc_file" 80)
+
+## VPN Snapshot
+
+$(excerpt "$vpn_file" 40)
+EOF
+
+  cat > "$OUT_DIR/SECURITY_POSTURE.md" <<EOF
+# Security Posture
+
+- generated_at_utc: $GENERATED_AT
+- management_reachability_validation: required before change
+- alias_entries_observed: $(count_lines "$alias_file")
+- firewall_rule_count: $(count_lines "$rule_file")
+
+## Aliases
+
+$(excerpt "$alias_file" 80)
+EOF
+
+  cat > "$OUT_DIR/USER_WORKFLOW.md" <<EOF
+# User Workflow
+
+- generated_at_utc: $GENERATED_AT
+- role: firewall and edge-services appliance
+- operator_note: use staged, validated, anti-lockout-safe workflows for config changes
+EOF
+
+  ttl="$(freshness_ttl_hours "$PROJECT_ROOT")"
+  write_manifest_bundle "$ttl"
+}
+
+write_switch_outputs() {
+  local sys_file if_file vlan_file cfg_file mac_file
+  sys_file="$SOURCE_DIR/01_system_info.txt"
+  if_file="$SOURCE_DIR/02_interfaces.txt"
+  vlan_file="$SOURCE_DIR/03_vlans.txt"
+  cfg_file="$SOURCE_DIR/04_running_config_summary.txt"
+  mac_file="$SOURCE_DIR/05_mac_table.txt"
+
+  local hostname_value model version ttl
+  hostname_value="$(grep '^hostname=' "$sys_file" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+  model="$(grep '^model=' "$sys_file" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+  version="$(grep '^software_version=' "$sys_file" 2>/dev/null | head -n 1 | cut -d= -f2-)"
+
+  cat > "$OUT_DIR/HOST_PROFILE.md" <<EOF
+# Host Profile
+
+- generated_at_utc: $GENERATED_AT
+- source_raw_audit_dir: $SOURCE_DIR
+- instance_id: $INSTANCE_ID
+- platform: $PLATFORM
+- device_name: ${DEVICE_NAME:-primary}
+- hostname: ${hostname_value:-unknown}
+- os_name: Managed Switch
+- os_version: ${version:-unknown}
+- hardware_model: ${model:-unknown}
+EOF
+
+  cat > "$OUT_DIR/OS_AND_KERNEL.md" <<EOF
+# OS and Firmware
+
+- generated_at_utc: $GENERATED_AT
+- firmware_version: ${version:-unknown}
+
+## Raw Snapshot
+
+$(excerpt "$sys_file" 40)
+EOF
+
+  cat > "$OUT_DIR/HARDWARE.md" <<EOF
+# Hardware
+
+- generated_at_utc: $GENERATED_AT
+- model: ${model:-unknown}
+- platform_family: switch
+EOF
+
+  cat > "$OUT_DIR/STORAGE.md" <<EOF
+# Storage
+
+- generated_at_utc: $GENERATED_AT
+- note: storage detail is not collected for the generic switch profile
+EOF
+
+  cat > "$OUT_DIR/TOOLCHAIN.md" <<EOF
+# Toolchain
+
+- generated_at_utc: $GENERATED_AT
+- note: operator toolchain inventory is not applicable to the generic switch profile
+EOF
+
+  cat > "$OUT_DIR/AI_STACK.md" <<EOF
+# AI Stack
+
+- generated_at_utc: $GENERATED_AT
+- note: AI tooling is not evaluated for switch profiles
+EOF
+
+  cat > "$OUT_DIR/NETWORK_AND_PORTS.md" <<EOF
+# Network and Ports
+
+- generated_at_utc: $GENERATED_AT
+- interface_rows_observed: $(count_lines "$if_file")
+- vlan_rows_observed: $(count_lines "$vlan_file")
+
+## Interfaces
+
+$(excerpt "$if_file" 80)
+
+## VLANs
+
+$(excerpt "$vlan_file" 80)
+
+## MAC Table
+
+$(excerpt "$mac_file" 80)
+EOF
+
+  cat > "$OUT_DIR/SERVICES.md" <<EOF
+# Services
+
+- generated_at_utc: $GENERATED_AT
+- note: the generic switch profile tracks control-plane config summary rather than process-level services
+
+## Config Summary
+
+$(excerpt "$cfg_file" 80)
+EOF
+
+  cat > "$OUT_DIR/SECURITY_POSTURE.md" <<EOF
+# Security Posture
+
+- generated_at_utc: $GENERATED_AT
+- management_reachability_validation: required before change
+- config_backup_required: yes
+- vlan_rows_observed: $(count_lines "$vlan_file")
+EOF
+
+  cat > "$OUT_DIR/USER_WORKFLOW.md" <<EOF
+# User Workflow
+
+- generated_at_utc: $GENERATED_AT
+- role: managed switching and access-layer operations
+- operator_note: validate VLAN, trunk, and management-plane state after changes
+EOF
+
+  ttl="$(freshness_ttl_hours "$PROJECT_ROOT")"
+  write_manifest_bundle "$ttl"
+}
+
+write_windows_outputs() {
+  local sys_file hw_file software_file net_file svc_file port_file sec_file update_file user_file
+  sys_file="$SOURCE_DIR/01_system_info.txt"
+  hw_file="$SOURCE_DIR/02_hardware_info.txt"
+  software_file="$SOURCE_DIR/03_installed_software.txt"
+  net_file="$SOURCE_DIR/04_network.txt"
+  svc_file="$SOURCE_DIR/05_services.txt"
+  port_file="$SOURCE_DIR/06_ports.txt"
+  sec_file="$SOURCE_DIR/07_security.txt"
+  update_file="$SOURCE_DIR/08_updates.txt"
+  user_file="$SOURCE_DIR/09_users.txt"
+
+  local hostname_value os_name os_version arch manufacturer model memory_total cpu_model ttl
+  hostname_value="$(grep '^CsName' "$sys_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  os_name="$(grep '^WindowsProductName' "$sys_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  os_version="$(grep '^WindowsVersion' "$sys_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  arch="$(grep '^OsArchitecture' "$sys_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  manufacturer="$(grep '^Manufacturer' "$hw_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  model="$(grep '^Model' "$hw_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  memory_total="$(grep '^TotalPhysicalMemory' "$hw_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+  cpu_model="$(grep '^Name' "$hw_file" 2>/dev/null | head -n 1 | cut -d: -f2- | xargs)"
+
+  cat > "$OUT_DIR/HOST_PROFILE.md" <<EOF
+# Host Profile
+
+- generated_at_utc: $GENERATED_AT
+- source_raw_audit_dir: $SOURCE_DIR
+- instance_id: $INSTANCE_ID
+- platform: $PLATFORM
+- device_name: ${DEVICE_NAME:-primary}
+- hostname: ${hostname_value:-unknown}
+- os_name: ${os_name:-Windows}
+- os_version: ${os_version:-unknown}
+- architecture: ${arch:-unknown}
+- manufacturer: ${manufacturer:-unknown}
+- model: ${model:-unknown}
+- memory_total: ${memory_total:-unknown}
+EOF
+
+  cat > "$OUT_DIR/OS_AND_KERNEL.md" <<EOF
+# OS and Kernel
+
+- generated_at_utc: $GENERATED_AT
+- os_name: ${os_name:-Windows}
+- os_version: ${os_version:-unknown}
+- architecture: ${arch:-unknown}
+
+## Raw Snapshot
+
+$(excerpt "$sys_file" 80)
+EOF
+
+  cat > "$OUT_DIR/HARDWARE.md" <<EOF
+# Hardware
+
+- generated_at_utc: $GENERATED_AT
+- manufacturer: ${manufacturer:-unknown}
+- model: ${model:-unknown}
+- cpu_model: ${cpu_model:-unknown}
+- memory_total: ${memory_total:-unknown}
+
+## Raw Snapshot
+
+$(excerpt "$hw_file" 80)
+EOF
+
+  cat > "$OUT_DIR/STORAGE.md" <<EOF
+# Storage
+
+- generated_at_utc: $GENERATED_AT
+- note: default Windows collector does not capture full disk inventory yet
+EOF
+
+  cat > "$OUT_DIR/TOOLCHAIN.md" <<EOF
+# Toolchain
+
+- generated_at_utc: $GENERATED_AT
+- installed_software_rows_observed: $(count_lines "$software_file")
+
+## Installed Software Snapshot
+
+$(excerpt "$software_file" 80)
+EOF
+
+  cat > "$OUT_DIR/AI_STACK.md" <<EOF
+# AI Stack
+
+- generated_at_utc: $GENERATED_AT
+- note: default Windows collector does not infer AI runtime posture yet
+EOF
+
+  cat > "$OUT_DIR/NETWORK_AND_PORTS.md" <<EOF
+# Network and Ports
+
+- generated_at_utc: $GENERATED_AT
+- listening_port_rows_observed: $(count_lines "$port_file")
+
+## Network Configuration
+
+$(excerpt "$net_file" 100)
+
+## Listening Ports
+
+$(excerpt "$port_file" 80)
+EOF
+
+  cat > "$OUT_DIR/SERVICES.md" <<EOF
+# Services
+
+- generated_at_utc: $GENERATED_AT
+- service_rows_observed: $(count_lines "$svc_file")
+
+$(excerpt "$svc_file" 100)
+EOF
+
+  cat > "$OUT_DIR/SECURITY_POSTURE.md" <<EOF
+# Security Posture
+
+- generated_at_utc: $GENERATED_AT
+- default_posture: baseline Windows security collector
+- firewall_profile_signal: captured when Get-NetFirewallProfile output is present
+- defender_signal: captured when Get-MpComputerStatus output is present
+
+## Security Snapshot
+
+$(excerpt "$sec_file" 100)
+
+## Updates Snapshot
+
+$(excerpt "$update_file" 80)
+EOF
+
+  cat > "$OUT_DIR/USER_WORKFLOW.md" <<EOF
+# User Workflow
+
+- generated_at_utc: $GENERATED_AT
+- role: Windows endpoint or server operations
+- operator_note: prefer PowerShell-native validation, source-cited syntax, and remote access preservation for Windows changes
+
+## Local Users and Groups
+
+$(excerpt "$user_file" 80)
+EOF
+
+  ttl="$(freshness_ttl_hours "$PROJECT_ROOT")"
+  write_manifest_bundle "$ttl"
+}
+
+write_generic_outputs() {
+  local ttl file_list raw_snapshot
+  file_list="$(find "$SOURCE_DIR" -maxdepth 1 -type f -printf '%f\n' 2>/dev/null | sort | paste -sd ', ' -)"
+  raw_snapshot="$(
+    while IFS= read -r raw_file; do
+      [ -n "$raw_file" ] || continue
+      echo "## $(basename "$raw_file")"
+      echo
+      excerpt "$raw_file" 80
+      echo
+    done < <(find "$SOURCE_DIR" -maxdepth 1 -type f | sort)
+  )"
+
+  cat > "$OUT_DIR/HOST_PROFILE.md" <<EOF
+# Host Profile
+
+- generated_at_utc: $GENERATED_AT
+- source_raw_audit_dir: $SOURCE_DIR
+- instance_id: $INSTANCE_ID
+- platform: $PLATFORM
+- device_name: ${DEVICE_NAME:-primary}
+- normalization_mode: generic-vendor
+- observed_raw_files: ${file_list:-none}
+- hostname: unknown
+- os_name: unknown
+- os_version: unknown
+EOF
+
+  cat > "$OUT_DIR/OS_AND_KERNEL.md" <<EOF
+# OS / Firmware
+
+- generated_at_utc: $GENERATED_AT
+- normalization_mode: generic-vendor
+- note: platform-specific OS or firmware parsing is not available yet; use project research notes and raw audit excerpts.
+EOF
+
+  cat > "$OUT_DIR/HARDWARE.md" <<EOF
+# Hardware
+
+- generated_at_utc: $GENERATED_AT
+- normalization_mode: generic-vendor
+- note: hardware parsing is not available for this platform family yet.
+EOF
+
+  cat > "$OUT_DIR/STORAGE.md" <<EOF
+# Storage
+
+- generated_at_utc: $GENERATED_AT
+- normalization_mode: generic-vendor
+- note: storage parsing is not available for this platform family yet.
+EOF
+
+  cat > "$OUT_DIR/TOOLCHAIN.md" <<EOF
+# Toolchain
+
+- generated_at_utc: $GENERATED_AT
+- normalization_mode: generic-vendor
+- note: toolchain parsing is not available for this platform family yet.
+EOF
+
+  cat > "$OUT_DIR/AI_STACK.md" <<EOF
+# AI Stack
+
+- generated_at_utc: $GENERATED_AT
+- normalization_mode: generic-vendor
+- note: AI runtime parsing is not available for this platform family yet.
+EOF
+
+  cat > "$OUT_DIR/NETWORK_AND_PORTS.md" <<EOF
+# Network and Ports
+
+- generated_at_utc: $GENERATED_AT
+- normalization_mode: generic-vendor
+- note: review raw audit excerpts and vendor research notes before network changes.
+
+$raw_snapshot
+EOF
+
+  cat > "$OUT_DIR/SERVICES.md" <<EOF
+# Services
+
+- generated_at_utc: $GENERATED_AT
+- normalization_mode: generic-vendor
+- note: service parsing is not available for this platform family yet.
+EOF
+
+  cat > "$OUT_DIR/SECURITY_POSTURE.md" <<EOF
+# Security Posture
+
+- generated_at_utc: $GENERATED_AT
+- normalization_mode: generic-vendor
+- default_posture: defensive-review-only
+- note: use project \`control/SECURITY_SCOPE.yaml\` before security testing and project research notes before vendor-specific commands.
+EOF
+
+  cat > "$OUT_DIR/USER_WORKFLOW.md" <<EOF
+# User Workflow
+
+- generated_at_utc: $GENERATED_AT
+- normalization_mode: generic-vendor
+- operator_note: create a project-local vendor/platform plan before mutation; define access, backup, validation, rollback, and management-path safety.
+EOF
+
+  ttl="$(freshness_ttl_hours "$PROJECT_ROOT")"
+  write_manifest_bundle "$ttl"
+}
+
+case "$PLATFORM" in
+  linux-desktop|linux-server)
+    write_linux_outputs
+    ;;
+  windows-desktop|windows-server)
+    write_windows_outputs
+    ;;
+  opnsense)
+    write_opnsense_outputs
+    ;;
+  switch)
+    write_switch_outputs
+    ;;
+  router|firewall|wireless-controller|nas|storage|hypervisor|generic-vendor|other)
+    write_generic_outputs
+    ;;
+  *)
+    die "normalization is not implemented for platform: $PLATFORM"
+    ;;
+esac
+
+echo "Normalized raw audit into: $OUT_DIR"

@@ -1,16 +1,20 @@
-# Sys-Agent Core - YOLO Protocol
+# SACST YOLO Protocol
 
-## Mode Semantics
-YOLO mode means "free range with telemetry and undo," NOT "no discipline." 
-When `MODE_STATE.yaml` specifies `yolo`:
-- Agents can execute direct changes without turn-by-turn user confirmation.
-- Agents MUST STILL log all critical actions.
-- Agents MUST STILL snapshot touched files.
+YOLO mode means direct execution with enforced telemetry and undo, not undisciplined automation.
 
-## Logging Requirements
-- Every action modifying the filesystem or system services must be appended to `logs/actions.jsonl`.
-- Critical actions must be appended to `logs/critical-actions.jsonl`.
+## Requirements
 
-## Rollback Requirements
-- Before editing a file classified under `CRITICAL_ACTION_CLASSES.md`, you must create a backup in `state/checkpoints/`.
-- The exact path to this backup must be logged.
+- Critical actions still require checkpointing, validation, and rollback references.
+- Writes still require logging.
+- Freshness gates still apply.
+- Repo-precedence detection still applies before target-repo edits.
+- Remote non-inspect changes must emit rollback manifests or explicit rollback references.
+
+## Disallowed in YOLO
+
+- Silent credential exposure
+- Blind destructive deletion
+- Remote network mutations without anti-lockout protection
+- Boot, crypto, and auth changes without checkpoint and validation plan
+- Destructive, disk, firmware, identity, or factory-reset work without explicit confirmation
+- Unmodeled vendor mutations without a project platform plan

@@ -1,0 +1,27 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Research Policy"
+type: object
+required:
+  - schema_version
+  - live_research_allowed
+  - prefer_primary_sources
+  - require_research_when
+  - prohibited_query_content
+properties:
+  schema_version:
+    type: integer
+    const: 1
+  live_research_allowed:
+    type: boolean
+  prefer_primary_sources:
+    type: boolean
+  require_research_when:
+    type: array
+    items:
+      type: string
+  prohibited_query_content:
+    type: array
+    items:
+      type: string
+  notes_dir:
+    type: string

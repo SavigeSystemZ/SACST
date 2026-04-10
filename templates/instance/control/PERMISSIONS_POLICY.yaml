@@ -1,0 +1,43 @@
+schema_version: 1
+read_scope:
+  - /
+write_scope:
+  - .
+command_scope:
+  - inspect
+  - audit
+  - report
+prohibited_actions:
+  - partition_without_explicit_task
+  - cryptsetup_change_without_explicit_task
+  - firewall_change_without_explicit_task
+  - unauthorized_security_testing
+  - exploit_validation_without_rules_of_engagement
+  - credential_attack_without_rules_of_engagement
+  - destructive_delete_without_explicit_confirmation
+  - factory_reset_without_explicit_confirmation
+  - default_credential_use_without_rotation_plan
+critical_action_classes:
+  - bootloader
+  - initramfs
+  - kernel
+  - disk
+  - crypto
+  - firewall
+  - network
+  - pam
+  - ssh_auth
+  - gpu_driver
+  - core_service
+  - security_test
+  - vulnerability_validation
+  - credential_audit
+  - web_app_test
+  - wireless_test
+  - exploit_validation
+  - delete
+  - destructive
+  - factory_reset
+  - firmware
+  - identity
+repo_precedence_required: true

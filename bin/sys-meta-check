@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+FAILURES=0
+
+pass() { echo "PASS: $*"; }
+fail() { echo "FAIL: $*"; FAILURES=$((FAILURES + 1)); }
+
+require_file() {
+  local rel="$1"
+  [ -f "$SYS_AGENT_ROOT/$rel" ] && pass "$rel exists" || fail "$rel missing"
+}
+
+require_absent() {
+  local rel="$1"
+  [ ! -e "$SYS_AGENT_ROOT/$rel" ] && pass "$rel absent" || fail "$rel should not exist in template repo"
+}
+
+require_file AGENTS.md
+require_file TEMPLATE_CONTEXT.md
+require_file canonical/TEMPLATE_MUTATION_POLICY.md
+require_file canonical/RUNTIME_BOUNDARY.md
+require_file canonical/PROJECT_SYNC_POLICY.md
+require_file canonical/REPO_PRECEDENCE.md
+require_file canonical/READ_BUNDLES.md
+require_file canonical/VENDOR_RESEARCH_PROTOCOL.md
+require_file canonical/CREDENTIAL_BOUNDARY.md
+require_file canonical/AUTHORIZED_SECURITY_TESTING.md
+require_file meta/TEMPLATE_VERSION.yaml
+require_file meta/PRECEDENCE_MANIFEST.yaml
+require_file meta/REPO_OPERATING_PROFILE.md
+require_file templates/instance/control/TEMPLATE_MANAGED_PATHS.yaml
+require_file bin/sys-fix
+require_file bin/sys-reconcile-project
+require_file bin/sys-research-plan
+require_file bin/sys-platform-plan
+require_file bin/sys-scope-check
+require_file bin/sys-validate
+
+require_absent framework
+require_absent instances
+
+if ! grep -q 'context/normalized/devices/<device-name>' "$SYS_AGENT_ROOT/canonical/READ_BUNDLES.md"; then
+  fail "canonical/READ_BUNDLES.md does not document per-device bundles"
+else
+  pass "per-device read bundle documented"
+fi
+
+if ! grep -qi 'live instance state in SACST' "$SYS_AGENT_ROOT/AGENTS.md"; then
+  fail "AGENTS.md missing template/runtime boundary instruction"
+else
+  pass "AGENTS.md declares runtime boundary"
+fi
+
+if ! grep -q 'Vendor Research Bundle' "$SYS_AGENT_ROOT/canonical/READ_BUNDLES.md"; then
+  fail "canonical/READ_BUNDLES.md does not document vendor research bundle"
+else
+  pass "vendor research read bundle documented"
+fi
+
+if ! grep -q 'Unmodeled Vendor Bundle' "$SYS_AGENT_ROOT/canonical/READ_BUNDLES.md"; then
+  fail "canonical/READ_BUNDLES.md does not document unmodeled vendor bundle"
+else
+  pass "unmodeled vendor read bundle documented"
+fi
+
+if ! grep -q 'control/SECURITY_SCOPE.yaml' "$SYS_AGENT_ROOT/AGENTS.md"; then
+  fail "AGENTS.md missing security scope instruction"
+else
+  pass "AGENTS.md declares security scope boundary"
+fi
+
+echo
+echo "Recommended SACST meta-system read order:"
+echo "1. AGENTS.md"
+echo "2. TEMPLATE_CONTEXT.md"
+echo "3. canonical/TEMPLATE_MUTATION_POLICY.md"
+echo "4. canonical/RUNTIME_BOUNDARY.md"
+echo "5. canonical/ARCHITECTURE.md"
+echo "6. canonical/PROJECT_SYNC_POLICY.md"
+echo "7. canonical/READ_BUNDLES.md"
+echo "8. canonical/VENDOR_RESEARCH_PROTOCOL.md"
+echo "9. canonical/CREDENTIAL_BOUNDARY.md"
+echo "10. canonical/AUTHORIZED_SECURITY_TESTING.md"
+
+if [ "$FAILURES" -gt 0 ]; then
+  exit 1
+fi

@@ -1,0 +1,9 @@
+uname -a
+cat /etc/os-release
+lscpu
+free -h
+lsblk
+systemctl list-units --type=service --state=running
+ss -tulpn
+ip addr
+ip route

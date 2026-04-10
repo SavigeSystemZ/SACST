@@ -1,27 +1,101 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
-INSTANCE="${1:-GhostZ}"
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
 
-echo "=== Sys-Agent Core Fixer: $INSTANCE ==="
-echo "Attempting to fix framework and permission issues..."
+usage() {
+  cat <<'EOF'
+Usage:
+  sys-fix --template [--deep]
+  sys-fix <project-path|instance-name> [--sync-template] [--strict]
 
-# 1. Fix script permissions
-echo "Ensuring scripts are executable..."
-chmod +x "$ROOT/framework/bin"/*
+Purpose:
+  Repair safe, mechanical SACST contract drift without hiding destructive changes.
+EOF
+}
 
-# 2. Check for missing core directories
-mkdir -p \
-  "$ROOT/instances/$INSTANCE/state/checkpoints" \
-  "$ROOT/instances/$INSTANCE/logs" \
-  "$ROOT/instances/$INSTANCE/runtime"
+[ $# -ge 1 ] || { usage; exit 1; }
 
-# 3. Re-initialize Git if missing
-if [ ! -d "$ROOT/.git" ]; then
-    echo "Initializing Git repository..."
-    git -C "$ROOT" init
-fi
+MODE="project"
+PROJECT_ROOT=""
+SYNC_TEMPLATE="false"
+STRICT="false"
+DEEP="false"
 
-echo "Self-healing steps complete. Rerunning sys-doctor..."
-"$ROOT/framework/bin/sys-doctor" "$INSTANCE"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --template)
+      MODE="template"
+      shift
+      ;;
+    --sync-template)
+      SYNC_TEMPLATE="true"
+      shift
+      ;;
+    --strict)
+      STRICT="true"
+      shift
+      ;;
+    --deep)
+      DEEP="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      if [ -z "$PROJECT_ROOT" ]; then
+        PROJECT_ROOT="$(resolve_project_arg "$1")"
+        shift
+      else
+        die "unexpected argument: $1"
+      fi
+      ;;
+  esac
+done
+
+fix_template() {
+  chmod +x "$SYS_AGENT_ROOT"/bin/sys-* 2>/dev/null || true
+  chmod +x "$SYS_AGENT_ROOT"/tests/integration/*.sh 2>/dev/null || true
+
+  "$SYS_AGENT_ROOT/bin/sys-meta-check"
+  "$SYS_AGENT_ROOT/bin/sys-validate" --template
+  if [ "$DEEP" = "true" ]; then
+    "$SYS_AGENT_ROOT/bin/sys-release" --dry-run
+  fi
+}
+
+fix_project() {
+  [ -n "$PROJECT_ROOT" ] || die "project path is required"
+  [ -f "$PROJECT_ROOT/control/PROJECT_PROFILE.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+  ensure_project_dirs "$PROJECT_ROOT"
+  ensure_project_owned_defaults "$PROJECT_ROOT"
+  upgrade_runtime_contracts "$PROJECT_ROOT"
+  if [ "$SYNC_TEMPLATE" = "true" ]; then
+    "$SYS_AGENT_ROOT/bin/sys-sync-template" "$PROJECT_ROOT" --report
+  fi
+  "$SYS_AGENT_ROOT/bin/sys-reconcile-project" "$PROJECT_ROOT" --report
+  "$SYS_AGENT_ROOT/bin/sys-generate-adapters" "$PROJECT_ROOT" >/dev/null
+
+  if [ "$STRICT" = "true" ]; then
+    "$SYS_AGENT_ROOT/bin/sys-validate" --project "$PROJECT_ROOT" --strict
+  else
+    "$SYS_AGENT_ROOT/bin/sys-validate" --project "$PROJECT_ROOT"
+  fi
+}
+
+case "$MODE" in
+  template)
+    fix_template
+    ;;
+  project)
+    fix_project
+    ;;
+  *)
+    die "unsupported mode: $MODE"
+    ;;
+esac
+
+echo "sys-fix complete"

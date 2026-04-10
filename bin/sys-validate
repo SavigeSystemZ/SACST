@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+MODE=""
+TARGET=""
+STRICT="false"
+FAILURES=0
+
+pass() { echo "PASS: $*"; }
+fail() { echo "FAIL: $*"; FAILURES=$((FAILURES + 1)); }
+warn_msg() { echo "WARN: $*"; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --template)
+      MODE="template"
+      TARGET="$SYS_AGENT_ROOT"
+      shift
+      ;;
+    --project)
+      MODE="project"
+      TARGET="$(resolve_project_arg "$2")"
+      shift 2
+      ;;
+    --strict)
+      STRICT="true"
+      shift
+      ;;
+    *)
+      die "unexpected argument: $1"
+      ;;
+  esac
+done
+
+[ -n "$MODE" ] || die "use --template or --project <path>"
+
+if [ "$MODE" = "template" ]; then
+  for required in AGENTS.md GEMINI.md CLAUDE.md TEMPLATE_CONTEXT.md README.md CHANGELOG.md canonical/ARCHITECTURE.md canonical/RUNTIME_BOUNDARY.md canonical/TEMPLATE_MUTATION_POLICY.md canonical/PROJECT_SYNC_POLICY.md canonical/SELF_HEALING.md canonical/VENDOR_RESEARCH_PROTOCOL.md canonical/CREDENTIAL_BOUNDARY.md canonical/AUTHORIZED_SECURITY_TESTING.md meta/TEMPLATE_VERSION.yaml meta/GIT_DEFAULTS.yaml platforms/generic-vendor/README.md platforms/windows-desktop/README.md platforms/windows-desktop/collect-manifest.yaml platforms/windows-server/README.md platforms/windows-server/collect-manifest.yaml templates/instance/control/MODE_POLICY.yaml templates/instance/control/TEMPLATE_MANAGED_PATHS.yaml templates/instance/control/SECURITY_SCOPE.yaml templates/instance/control/CREDENTIAL_REFERENCES.yaml templates/instance/control/RESEARCH_POLICY.yaml schemas/runtime-state.schema.yaml schemas/mode-policy.schema.yaml schemas/freshness-policy.schema.yaml schemas/security-scope.schema.yaml schemas/credential-references.schema.yaml schemas/research-policy.schema.yaml bin/sys-init bin/sys-refresh bin/sys-normalize bin/sys-generate-adapters bin/sys-preflight bin/sys-scope-check bin/sys-research-plan bin/sys-platform-plan bin/sys-git-bootstrap bin/sys-project-status bin/sys-project-update bin/sys-release bin/sys-export-candidate bin/sys-import-candidate bin/sys-promote-candidate bin/sys-reconcile-project bin/sys-meta-check bin/sys-schema-validate bin/sys-validate; do
+    [ -e "$TARGET/$required" ] && pass "$required exists" || fail "$required is missing"
+  done
+
+  for forbidden in framework instances; do
+    [ ! -e "$TARGET/$forbidden" ] && pass "$forbidden absent" || fail "$forbidden should not exist in SACST"
+  done
+else
+  for required in AGENTS.md GEMINI.md CLAUDE.md LOCAL_CONTEXT.md control/PROJECT_PROFILE.yaml control/MODE_POLICY.yaml control/PERMISSIONS_POLICY.yaml control/FRESHNESS_POLICY.yaml control/SECURITY_SCOPE.yaml control/CREDENTIAL_REFERENCES.yaml control/RESEARCH_POLICY.yaml control/SYSTEM_MAP.md control/TEMPLATE_MANAGED_PATHS.yaml inventory/devices.yaml research/README.md runtime/MODE_STATE.yaml runtime/RUNTIME_STATE.yaml .github/copilot-instructions.md .cursor/rules/10-precedence.mdc; do
+    [ -e "$TARGET/$required" ] && pass "$required exists" || fail "$required is missing"
+  done
+
+  if [ "$STRICT" = "true" ]; then
+    for required in context/normalized/HOST_PROFILE.md context/normalized/NETWORK_AND_PORTS.md context/normalized/NORMALIZATION_MANIFEST.yaml; do
+      [ -e "$TARGET/$required" ] && pass "$required exists" || fail "$required is missing"
+    done
+  else
+    for maybe in context/normalized/HOST_PROFILE.md context/normalized/NORMALIZATION_MANIFEST.yaml; do
+      [ -e "$TARGET/$maybe" ] && pass "$maybe exists" || warn_msg "$maybe not present yet"
+    done
+  fi
+
+  for optional_schema in \
+    "$TARGET/context/normalized/FRESHNESS_STATE.yaml:freshness-state.schema.yaml" \
+    "$TARGET/context/normalized/NORMALIZATION_MANIFEST.yaml:normalization-manifest.schema.yaml" \
+    "$TARGET/runtime/ADAPTER_MANIFEST.yaml:adapter-manifest.schema.yaml"; do
+    FILE_PATH="${optional_schema%%:*}"
+    SCHEMA_NAME="${optional_schema##*:}"
+    if [ -f "$FILE_PATH" ]; then
+      if schema_validate_path "$SYS_AGENT_ROOT/schemas/$SCHEMA_NAME" "$FILE_PATH" >/dev/null 2>&1; then
+        pass "$FILE_PATH matches $SCHEMA_NAME"
+      else
+        fail "$FILE_PATH failed schema validation for $SCHEMA_NAME"
+      fi
+    fi
+  done
+
+  while read -r state_file; do
+    if schema_validate_path "$SYS_AGENT_ROOT/schemas/device-state.schema.yaml" "$state_file" >/dev/null 2>&1; then
+      pass "$state_file matches device-state.schema.yaml"
+    else
+      fail "$state_file failed schema validation for device-state.schema.yaml"
+    fi
+  done < <(find "$TARGET/runtime/devices" -name DEVICE_STATE.yaml -type f 2>/dev/null)
+
+  while read -r manifest_file; do
+    if schema_validate_path "$SYS_AGENT_ROOT/schemas/normalization-manifest.schema.yaml" "$manifest_file" >/dev/null 2>&1; then
+      pass "$manifest_file matches normalization-manifest.schema.yaml"
+    else
+      fail "$manifest_file failed schema validation for normalization-manifest.schema.yaml"
+    fi
+  done < <(find "$TARGET/context/normalized/devices" -name NORMALIZATION_MANIFEST.yaml -type f 2>/dev/null)
+
+  while read -r freshness_file; do
+    if schema_validate_path "$SYS_AGENT_ROOT/schemas/freshness-state.schema.yaml" "$freshness_file" >/dev/null 2>&1; then
+      pass "$freshness_file matches freshness-state.schema.yaml"
+    else
+      fail "$freshness_file failed schema validation for freshness-state.schema.yaml"
+    fi
+  done < <(find "$TARGET/context/normalized/devices" -name FRESHNESS_STATE.yaml -type f 2>/dev/null)
+
+  while read -r checkpoint_file; do
+    if schema_validate_path "$SYS_AGENT_ROOT/schemas/checkpoint.schema.yaml" "$checkpoint_file" >/dev/null 2>&1; then
+      pass "$checkpoint_file matches checkpoint.schema.yaml"
+    else
+      fail "$checkpoint_file failed schema validation for checkpoint.schema.yaml"
+    fi
+  done < <(find "$TARGET/state/rollback" -name 'checkpoint-*.yaml' -type f 2>/dev/null)
+
+  while read -r rollback_file; do
+    if schema_validate_path "$SYS_AGENT_ROOT/schemas/rollback-manifest.schema.yaml" "$rollback_file" >/dev/null 2>&1; then
+      pass "$rollback_file matches rollback-manifest.schema.yaml"
+    else
+      fail "$rollback_file failed schema validation for rollback-manifest.schema.yaml"
+    fi
+  done < <(find "$TARGET/state/rollback" -name 'remote-*.yaml' -type f 2>/dev/null)
+
+  for file_schema in \
+    "$TARGET/control/PROJECT_PROFILE.yaml:repo-operating-profile.schema.yaml" \
+    "$TARGET/control/MODE_POLICY.yaml:mode-policy.schema.yaml" \
+    "$TARGET/control/PERMISSIONS_POLICY.yaml:permissions.schema.yaml" \
+    "$TARGET/control/FRESHNESS_POLICY.yaml:freshness-policy.schema.yaml" \
+    "$TARGET/control/SECURITY_SCOPE.yaml:security-scope.schema.yaml" \
+    "$TARGET/control/CREDENTIAL_REFERENCES.yaml:credential-references.schema.yaml" \
+    "$TARGET/control/RESEARCH_POLICY.yaml:research-policy.schema.yaml" \
+    "$TARGET/inventory/devices.yaml:inventory.schema.yaml" \
+    "$TARGET/runtime/MODE_STATE.yaml:mode-state.schema.yaml" \
+    "$TARGET/runtime/RUNTIME_STATE.yaml:runtime-state.schema.yaml"; do
+    FILE_PATH="${file_schema%%:*}"
+    SCHEMA_NAME="${file_schema##*:}"
+    if schema_validate_path "$SYS_AGENT_ROOT/schemas/$SCHEMA_NAME" "$FILE_PATH" >/dev/null 2>&1; then
+      pass "$FILE_PATH matches $SCHEMA_NAME"
+    else
+      fail "$FILE_PATH failed schema validation for $SCHEMA_NAME"
+    fi
+  done
+
+  for file_schema in \
+    "$TARGET/logs/actions.jsonl:action-log.schema.yaml" \
+    "$TARGET/logs/critical-actions.jsonl:action-log.schema.yaml" \
+    "$TARGET/logs/feedback.jsonl:feedback.schema.yaml" \
+    "$TARGET/logs/sessions.jsonl:session-log.schema.yaml"; do
+    FILE_PATH="${file_schema%%:*}"
+    SCHEMA_NAME="${file_schema##*:}"
+    if [ -s "$FILE_PATH" ]; then
+      if jsonl_validate_path "$SYS_AGENT_ROOT/schemas/$SCHEMA_NAME" "$FILE_PATH" >/dev/null 2>&1; then
+        pass "$FILE_PATH matches $SCHEMA_NAME"
+      else
+        fail "$FILE_PATH failed JSONL schema validation for $SCHEMA_NAME"
+      fi
+    else
+      pass "$FILE_PATH is empty or absent of entries"
+    fi
+  done
+fi
+
+if [ "$FAILURES" -gt 0 ]; then
+  exit 1
+fi

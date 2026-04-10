@@ -1,0 +1,4 @@
+schema_version: 1
+normalized_context_ttl_hours: 24
+security_context_ttl_hours: 12
+require_refresh_for_critical_when_stale: true

@@ -1,6 +1,37 @@
 $schema: "http://json-schema.org/draft-07/schema#"
+title: "Permissions Policy"
 type: object
+required:
+  - schema_version
+  - read_scope
+  - write_scope
+  - command_scope
+  - prohibited_actions
+  - critical_action_classes
+  - repo_precedence_required
 properties:
-  read_scope: { type: array, items: { type: string } }
-  write_scope: { type: array, items: { type: string } }
-  prohibited_actions: { type: array, items: { type: string } }
+  schema_version:
+    type: integer
+    const: 1
+  read_scope:
+    type: array
+    items:
+      type: string
+  write_scope:
+    type: array
+    items:
+      type: string
+  command_scope:
+    type: array
+    items:
+      type: string
+  prohibited_actions:
+    type: array
+    items:
+      type: string
+  critical_action_classes:
+    type: array
+    items:
+      type: string
+  repo_precedence_required:
+    type: boolean

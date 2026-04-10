@@ -1,18 +1,33 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="${SYS_AGENT_ROOT:-$HOME/.MyAdminZ/_SYS_AGENT_CORE_TEMPLATE}"
-INSTANCE="${1:-GhostZ}"
-NEW_MODE="${2:-advisor}"
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
 
-MODE_FILE="$ROOT/instances/$INSTANCE/runtime/MODE_STATE.yaml"
+usage() {
+  cat <<'EOF'
+Usage: sys-mode <project-path|instance-name> [advisor|operator|yolo]
+EOF
+}
 
-if [ ! -f "$MODE_FILE" ]; then
-    echo "Error: Mode file not found for instance $INSTANCE"
-    exit 1
+[ $# -ge 1 ] || { usage; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+[ -f "$PROJECT_ROOT/control/MODE_POLICY.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+if [ $# -eq 1 ]; then
+  echo "$(current_mode "$PROJECT_ROOT")"
+  exit 0
 fi
 
-# Simple sed replacement for mode
-sed -i "s/^mode: .*/mode: $NEW_MODE/" "$MODE_FILE"
+NEW_MODE="$2"
+case "$NEW_MODE" in
+  advisor|operator|yolo) ;;
+  *) die "invalid mode: $NEW_MODE" ;;
+esac
 
-echo "Instance $INSTANCE mode switched to: $NEW_MODE"
+sed -i "s/^mode: .*/mode: $NEW_MODE/" "$PROJECT_ROOT/runtime/MODE_STATE.yaml"
+if [ -f "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" ]; then
+  sed -i "s/^mode: .*/mode: $NEW_MODE/" "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml"
+fi
+
+echo "Mode set to $NEW_MODE for $PROJECT_ROOT"

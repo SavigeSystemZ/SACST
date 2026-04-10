@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+[ $# -eq 2 ] || { echo "Usage: sys-rollback <project-path|instance-name> <checkpoint-manifest>" >&2; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+MANIFEST="$(realpath_safe "$2")"
+[ -f "$MANIFEST" ] || die "manifest not found: $MANIFEST"
+
+awk '
+  $1 == "-" && $2 == "source:" { source = $3; next }
+  $1 == "backup:" { print source "\t" $2 }
+' "$MANIFEST" | while IFS=$'\t' read -r source backup; do
+  mkdir -p "$(dirname "$source")"
+  cp "$backup" "$source"
+done
+
+echo "Rollback complete from $MANIFEST"

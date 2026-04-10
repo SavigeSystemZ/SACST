@@ -1,0 +1,17 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+title: "Topology"
+type: object
+required:
+  - schema_version
+properties:
+  schema_version:
+    type: integer
+    const: 1
+  networks:
+    type: array
+    items:
+      type: object
+  links:
+    type: array
+    items:
+      type: object

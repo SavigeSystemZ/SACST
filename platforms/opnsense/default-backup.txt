@@ -1,0 +1,1 @@
+cp /conf/config.xml /tmp/sacst-config-$(date +%Y%m%dT%H%M%S).xml

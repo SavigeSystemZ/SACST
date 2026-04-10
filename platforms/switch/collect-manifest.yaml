@@ -1,0 +1,15 @@
+schema_version: 1
+transport_modes:
+  - ssh
+  - console
+captures:
+  - outfile: 01_system_info.txt
+    command: show version
+  - outfile: 02_interfaces.txt
+    command: show interfaces status
+  - outfile: 03_vlans.txt
+    command: show vlan brief
+  - outfile: 04_running_config_summary.txt
+    command: show running-config | include hostname|interface|ip default-gateway
+  - outfile: 05_mac_table.txt
+    command: show mac address-table

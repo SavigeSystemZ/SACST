@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: sys-preflight <project-path|instance-name> --action-class <class> [--activity <activity>] [--confirmed]
+EOF
+}
+
+[ $# -ge 3 ] || { usage; exit 1; }
+
+PROJECT_ROOT="$(resolve_project_arg "$1")"
+shift
+
+ACTION_CLASS=""
+ACTIVITY=""
+CONFIRMED="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --action-class)
+      ACTION_CLASS="$2"
+      shift 2
+      ;;
+    --confirmed)
+      CONFIRMED="true"
+      shift
+      ;;
+    --activity)
+      ACTIVITY="$2"
+      shift 2
+      ;;
+    *)
+      die "unexpected argument: $1"
+      ;;
+  esac
+done
+
+[ -n "$ACTION_CLASS" ] || die "--action-class is required"
+[ -n "$ACTIVITY" ] || ACTIVITY="$ACTION_CLASS"
+[ -f "$PROJECT_ROOT/control/MODE_POLICY.yaml" ] || die "not a SACST project repo: $PROJECT_ROOT"
+
+MODE="$(current_mode "$PROJECT_ROOT")"
+TTL="$(freshness_ttl_hours "$PROJECT_ROOT")"
+LAST_REFRESH="$(yaml_scalar "$PROJECT_ROOT/runtime/RUNTIME_STATE.yaml" last_refresh_utc 2>/dev/null || true)"
+FRESHNESS="$(freshness_status_from_last_refresh "${LAST_REFRESH:-}" "$TTL")"
+
+if [ "$MODE" = "advisor" ] && [ "$ACTION_CLASS" != "inspect" ]; then
+  die "advisor mode blocks non-inspect actions"
+fi
+
+if [ "$ACTION_CLASS" = "package" ] && [ "$(yaml_bool "$PROJECT_ROOT/runtime/MODE_STATE.yaml" allow_package_changes)" != "true" ]; then
+  die "package changes are not allowed in the current mode"
+fi
+
+if [[ "$ACTION_CLASS" =~ ^(service|core_service)$ ]] && [ "$(yaml_bool "$PROJECT_ROOT/runtime/MODE_STATE.yaml" allow_service_changes)" != "true" ]; then
+  die "service changes are not allowed in the current mode"
+fi
+
+if [[ "$ACTION_CLASS" =~ ^(network|firewall|routing|switch)$ ]] && [ "$(yaml_bool "$PROJECT_ROOT/runtime/MODE_STATE.yaml" allow_network_changes)" != "true" ]; then
+  die "network changes are not allowed in the current mode"
+fi
+
+if [[ "$ACTION_CLASS" =~ ^(bootloader|initramfs|kernel|disk|crypto)$ ]] && [ "$(yaml_bool "$PROJECT_ROOT/runtime/MODE_STATE.yaml" allow_boot_changes)" != "true" ]; then
+  die "boot or storage changes are not allowed in the current mode"
+fi
+
+if [[ "$ACTION_CLASS" =~ ^(delete|destructive|factory_reset|firmware|bootloader|initramfs|kernel|disk|crypto|pam|ssh_auth|identity)$ ]] && [ "$CONFIRMED" != "true" ]; then
+  die "destructive or core-system action requires --confirmed regardless of mode"
+fi
+
+if [[ "$ACTION_CLASS" =~ ^(security_test|pentest|vulnerability_validation|credential_audit|web_app_test|wireless_test|exploit_validation)$ ]]; then
+  "$SYS_AGENT_ROOT/bin/sys-scope-check" "$PROJECT_ROOT" --activity "$ACTIVITY" >/dev/null
+fi
+
+if is_critical_action "$PROJECT_ROOT" "$ACTION_CLASS"; then
+  if [ "$MODE" = "operator" ] && [ "$CONFIRMED" != "true" ]; then
+    die "operator mode requires --confirmed for critical actions"
+  fi
+  if [ "$FRESHNESS" = "stale" ] && [ "$(yaml_bool "$PROJECT_ROOT/control/FRESHNESS_POLICY.yaml" require_refresh_for_critical_when_stale)" = "true" ]; then
+    die "critical action blocked because normalized context is stale"
+  fi
+fi
+
+echo "Preflight passed for $ACTION_CLASS on $PROJECT_ROOT"
