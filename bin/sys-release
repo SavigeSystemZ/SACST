@@ -50,6 +50,8 @@ TAG="sacst-v$VERSION"
 "$SYS_AGENT_ROOT/tests/integration/test_security_scope.sh" >/dev/null
 "$SYS_AGENT_ROOT/tests/integration/test_research_plan.sh" >/dev/null
 "$SYS_AGENT_ROOT/tests/integration/test_platform_plan.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_vendor_profile.sh" >/dev/null
+"$SYS_AGENT_ROOT/tests/integration/test_secret_check.sh" >/dev/null
 "$SYS_AGENT_ROOT/tests/integration/test_destructive_preflight.sh" >/dev/null
 "$SYS_AGENT_ROOT/tests/integration/test_learning_flow.sh" >/dev/null
 

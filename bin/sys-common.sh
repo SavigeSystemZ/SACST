@@ -327,7 +327,7 @@ current_mode() {
 }
 
 latest_raw_dir() {
-  find "$1/raw-audit" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | tail -n 1
+  find "$1/raw-audit" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}T[0-9]{6}Z' 2>/dev/null | sort | tail -n 1
 }
 
 freshness_ttl_hours() {

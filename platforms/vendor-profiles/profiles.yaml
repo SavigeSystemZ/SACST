@@ -1,0 +1,283 @@
+schema_version: 1
+profiles:
+  - profile_key: cisco-ios
+    vendor: Cisco
+    families: [IOS, IOS-XE]
+    device_classes: [router, switch, firewall]
+    access_methods: [ssh, console]
+    safe_inspect_commands:
+      - show version
+      - show running-config
+      - show interfaces status
+      - show ip interface brief
+      - show ip route
+    backup_commands:
+      - show running-config
+      - copy running-config startup-config
+    validation_commands:
+      - show version
+      - show interfaces status
+      - show ip route
+    rollback_notes:
+      - Use archived running-config or startup-config restore when available.
+      - Prefer reload-in or commit-confirmed equivalent where supported by platform/version.
+    critical_operations: [routing, vlan, trunk, aaa, management-plane, firmware]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [config-mode syntax, firmware behavior, aaa, routing, access-list changes]
+  - profile_key: cisco-nxos
+    vendor: Cisco
+    families: [NX-OS]
+    device_classes: [switch, router]
+    access_methods: [ssh, console]
+    safe_inspect_commands:
+      - show version
+      - show running-config
+      - show interface brief
+      - show vlan brief
+      - show ip route
+    backup_commands:
+      - show running-config
+      - copy running-config startup-config
+    validation_commands:
+      - show interface brief
+      - show vlan brief
+      - show ip route
+    rollback_notes:
+      - Use checkpoint/rollback when supported and verified for target version.
+    critical_operations: [vpc, vlan, trunk, routing, aaa, management-plane, firmware]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [checkpoint rollback, vpc, routing, firmware, aaa changes]
+  - profile_key: juniper-junos
+    vendor: Juniper
+    families: [Junos]
+    device_classes: [router, switch, firewall]
+    access_methods: [ssh, console]
+    safe_inspect_commands:
+      - show version
+      - show configuration
+      - show interfaces terse
+      - show route
+    backup_commands:
+      - show configuration
+    validation_commands:
+      - show interfaces terse
+      - show route
+      - show system commit
+    rollback_notes:
+      - Prefer commit confirmed with an explicit timeout for risky changes.
+      - Use rollback <n> only after verifying target commit history.
+    critical_operations: [routing, firewall-filter, security-policy, vlan, aaa, management-plane, firmware]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [commit confirmed, rollback, routing policy, security policy]
+  - profile_key: aruba-aos-cx
+    vendor: Aruba
+    families: [AOS-CX]
+    device_classes: [switch]
+    access_methods: [ssh, console]
+    safe_inspect_commands:
+      - show version
+      - show running-config
+      - show interface brief
+      - show vlan
+      - show lldp neighbor-info
+    backup_commands:
+      - show running-config
+    validation_commands:
+      - show interface brief
+      - show vlan
+      - show lldp neighbor-info
+    rollback_notes:
+      - Preserve running config export before mutation.
+      - Verify checkpoint support for the exact model/version.
+    critical_operations: [vlan, trunk, lag, aaa, management-plane, firmware]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [checkpoint support, vlan/trunk syntax, firmware behavior]
+  - profile_key: ubiquiti-unifi
+    vendor: Ubiquiti
+    families: [UniFi, EdgeOS]
+    device_classes: [router, switch, wireless-controller, firewall]
+    access_methods: [ssh, controller-ui, api]
+    safe_inspect_commands:
+      - show version
+      - show configuration
+      - info
+    backup_commands:
+      - controller backup export or show configuration, depending on product family
+    validation_commands:
+      - verify controller device state and management reachability
+    rollback_notes:
+      - Prefer controller backup restore for UniFi-managed devices.
+      - Avoid direct CLI mutation on controller-managed devices unless vendor guidance supports it.
+    critical_operations: [controller-adoption, vlan, wlan, firewall, routing, firmware]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [controller API, EdgeOS vs UniFi syntax, adoption behavior]
+  - profile_key: mikrotik-routeros
+    vendor: MikroTik
+    families: [RouterOS]
+    device_classes: [router, switch, firewall, wireless-controller]
+    access_methods: [ssh, winbox, api, console]
+    safe_inspect_commands:
+      - /system resource print
+      - /export hide-sensitive
+      - /interface print
+      - /ip address print
+      - /ip route print
+    backup_commands:
+      - /export hide-sensitive
+      - /system backup save
+    validation_commands:
+      - /interface print
+      - /ip route print
+      - /tool ping 1.1.1.1 count=3
+    rollback_notes:
+      - Export text config before mutation; binary backups are device/version sensitive.
+      - Confirm safe-mode workflow before risky remote changes.
+    critical_operations: [firewall, nat, routing, bridge, vlan, wireless, firmware]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [safe mode, RouterOS v6/v7 syntax, firewall/nat changes]
+  - profile_key: fortinet-fortios
+    vendor: Fortinet
+    families: [FortiOS]
+    device_classes: [firewall, router]
+    access_methods: [ssh, web-ui, api, console]
+    safe_inspect_commands:
+      - get system status
+      - show full-configuration
+      - get router info routing-table all
+      - diagnose sys session stat
+    backup_commands:
+      - execute backup config
+    validation_commands:
+      - get system status
+      - get router info routing-table all
+      - diagnose sys top-summary
+    rollback_notes:
+      - Preserve config backup before policy/routing changes.
+      - Verify config restore method for the target FortiOS version and management path.
+    critical_operations: [firewall-policy, nat, vpn, routing, ha, admin-auth, firmware]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [policy order, vpn, ha, config restore, firmware behavior]
+  - profile_key: proxmox-ve
+    vendor: Proxmox
+    families: [Proxmox-VE]
+    device_classes: [hypervisor, server]
+    access_methods: [ssh, web-ui, api]
+    safe_inspect_commands:
+      - pveversion -v
+      - pvesh get /nodes
+      - qm list
+      - pct list
+      - pvecm status
+    backup_commands:
+      - vzdump --help
+      - pvesh get /cluster/backup
+    validation_commands:
+      - pveversion
+      - systemctl is-active pvedaemon
+      - systemctl is-active pveproxy
+    rollback_notes:
+      - Use snapshots/backups before VM, container, storage, or cluster changes.
+      - Cluster and storage changes require explicit maintenance planning.
+    critical_operations: [cluster, storage, networking, vm-delete, container-delete, update, backup-restore]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [cluster quorum, storage backend, backup restore, network bridge changes]
+  - profile_key: truenas
+    vendor: iXsystems
+    families: [TrueNAS-CORE, TrueNAS-SCALE]
+    device_classes: [nas, storage, server]
+    access_methods: [ssh, web-ui, api]
+    safe_inspect_commands:
+      - midclt call system.info
+      - zpool status
+      - zfs list
+    backup_commands:
+      - export system config through UI or supported API
+    validation_commands:
+      - zpool status
+      - zfs list
+      - midclt call system.info
+    rollback_notes:
+      - Preserve system config and confirm snapshot/replication state before storage changes.
+    critical_operations: [pool, dataset, snapshot, replication, share, update, disk-replace]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [CORE vs SCALE API, pool operations, replication, update behavior]
+  - profile_key: pfsense
+    vendor: Netgate
+    families: [pfSense]
+    device_classes: [firewall, router]
+    access_methods: [ssh, web-ui, console]
+    safe_inspect_commands:
+      - pfctl -sr
+      - netstat -rn
+      - ifconfig
+      - php -v
+    backup_commands:
+      - export config.xml through UI or supported shell method
+    validation_commands:
+      - pfctl -sr
+      - netstat -rn
+      - ifconfig
+    rollback_notes:
+      - Preserve config.xml before changes.
+      - Confirm console or alternate management path before firewall/routing changes.
+    critical_operations: [firewall, nat, vpn, routing, interface, package, update]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [config.xml restore, pf rule generation, package behavior, version differences]
+  - profile_key: synology-dsm
+    vendor: Synology
+    families: [DSM]
+    device_classes: [nas, storage]
+    access_methods: [ssh, web-ui, api]
+    safe_inspect_commands:
+      - uname -a
+      - synoservice --status
+      - df -h
+      - cat /etc.defaults/VERSION
+    backup_commands:
+      - export DSM configuration through UI or supported API
+    validation_commands:
+      - synoservice --status
+      - df -h
+      - cat /etc.defaults/VERSION
+    rollback_notes:
+      - Preserve DSM configuration and snapshot/backup state before storage or package changes.
+    critical_operations: [storage-pool, volume, share, package, update, user-permission]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [DSM version-specific CLI, package behavior, storage operations]
+  - profile_key: dell-idrac
+    vendor: Dell
+    families: [iDRAC]
+    device_classes: [bmc, server-management]
+    access_methods: [ssh, web-ui, redfish, racadm]
+    safe_inspect_commands:
+      - racadm getsysinfo
+      - racadm getversion
+      - racadm getniccfg
+    backup_commands:
+      - export server profile through supported iDRAC UI/API/racadm flow
+    validation_commands:
+      - racadm getsysinfo
+      - racadm getversion
+    rollback_notes:
+      - Preserve server profile and management network settings before firmware or auth changes.
+    critical_operations: [firmware, bios, power, virtual-media, user-auth, management-network]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [racadm syntax by iDRAC version, redfish actions, firmware update]
+  - profile_key: hpe-ilo
+    vendor: HPE
+    families: [iLO]
+    device_classes: [bmc, server-management]
+    access_methods: [ssh, web-ui, redfish, ilorest]
+    safe_inspect_commands:
+      - show /system1
+      - show /map1
+    backup_commands:
+      - export iLO configuration through supported UI/API/ilorest flow
+    validation_commands:
+      - show /system1
+      - show /map1
+    rollback_notes:
+      - Preserve iLO configuration and management network settings before firmware or auth changes.
+    critical_operations: [firmware, bios, power, virtual-media, user-auth, management-network]
+    default_credential_policy: never-store; verify and rotate if encountered
+    research_required_for: [iLO generation syntax, redfish actions, ilorest workflow, firmware update]

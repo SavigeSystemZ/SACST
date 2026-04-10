@@ -58,5 +58,7 @@ jobs:
           ./tests/integration/test_security_scope.sh
           ./tests/integration/test_research_plan.sh
           ./tests/integration/test_platform_plan.sh
+          ./tests/integration/test_vendor_profile.sh
+          ./tests/integration/test_secret_check.sh
           ./tests/integration/test_destructive_preflight.sh
           ./tests/integration/test_learning_flow.sh

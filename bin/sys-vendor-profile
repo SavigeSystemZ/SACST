@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+source "$(cd "$(dirname "$0")" && pwd)/sys-common.sh"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  sys-vendor-profile --list
+  sys-vendor-profile --vendor <profile-key>
+  sys-vendor-profile --vendor <profile-key> --project <project-path|instance-name> [--emit-plan]
+
+Shows a safe starting profile for common vendors. Profiles are planning inputs,
+not authorization to mutate devices.
+EOF
+}
+
+LIST="false"
+PROFILE_KEY=""
+PROJECT_ROOT=""
+EMIT_PLAN="false"
+CATALOG="$SYS_AGENT_ROOT/platforms/vendor-profiles/profiles.yaml"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --list)
+      LIST="true"
+      shift
+      ;;
+    --vendor)
+      PROFILE_KEY="$2"
+      shift 2
+      ;;
+    --project)
+      PROJECT_ROOT="$(resolve_project_arg "$2")"
+      shift 2
+      ;;
+    --emit-plan)
+      EMIT_PLAN="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unexpected argument: $1"
+      ;;
+  esac
+done
+
+[ -f "$CATALOG" ] || die "vendor catalog not found: $CATALOG"
+
+if [ "$LIST" = "true" ]; then
+  python3 - "$CATALOG" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], "r", encoding="utf-8") as fh:
+    data = yaml.safe_load(fh) or {}
+
+for profile in data.get("profiles", []):
+    print(f"{profile['profile_key']}\t{profile['vendor']}\t{', '.join(profile.get('families', []))}")
+PY
+  exit 0
+fi
+
+[ -n "$PROFILE_KEY" ] || { usage; exit 1; }
+
+PROFILE_JSON="$(python3 - "$CATALOG" "$PROFILE_KEY" <<'PY'
+import json
+import sys
+import yaml
+
+catalog, key = sys.argv[1:]
+with open(catalog, "r", encoding="utf-8") as fh:
+    data = yaml.safe_load(fh) or {}
+
+for profile in data.get("profiles", []):
+    if profile.get("profile_key") == key:
+        print(json.dumps(profile))
+        raise SystemExit(0)
+
+raise SystemExit(f"vendor profile not found: {key}")
+PY
+)"
+
+if [ "$EMIT_PLAN" = "true" ]; then
+  [ -n "$PROJECT_ROOT" ] || die "--project is required with --emit-plan"
+  python3 - "$PROFILE_JSON" "$PROJECT_ROOT" "$SYS_AGENT_ROOT" <<'PY'
+import json
+import subprocess
+import sys
+
+profile = json.loads(sys.argv[1])
+project_root = sys.argv[2]
+root = sys.argv[3]
+device_class = profile.get("device_classes", ["generic-vendor"])[0]
+access_method = profile.get("access_methods", ["unknown"])[0]
+intent = f"plan safe work for {profile['vendor']} {', '.join(profile.get('families', []))}"
+subprocess.run(
+    [
+        f"{root}/bin/sys-platform-plan",
+        project_root,
+        "--vendor",
+        profile["vendor"],
+        "--device-class",
+        device_class,
+        "--model",
+        "/".join(profile.get("families", [])),
+        "--access-method",
+        access_method,
+        "--intent",
+        intent,
+    ],
+    check=True,
+)
+PY
+  exit 0
+fi
+
+python3 - "$PROFILE_JSON" <<'PY'
+import json
+import sys
+
+profile = json.loads(sys.argv[1])
+
+def block(title, values):
+    print(f"\n## {title}\n")
+    for value in values:
+        print(f"- {value}")
+
+print(f"# Vendor Profile: {profile['profile_key']}")
+print()
+print(f"- vendor: {profile['vendor']}")
+print(f"- families: {', '.join(profile.get('families', []))}")
+print(f"- device_classes: {', '.join(profile.get('device_classes', []))}")
+print(f"- access_methods: {', '.join(profile.get('access_methods', []))}")
+print(f"- default_credential_policy: {profile.get('default_credential_policy')}")
+block("Safe Inspect Commands", profile.get("safe_inspect_commands", []))
+block("Backup Commands / Methods", profile.get("backup_commands", []))
+block("Validation Commands", profile.get("validation_commands", []))
+block("Rollback Notes", profile.get("rollback_notes", []))
+block("Critical Operations", profile.get("critical_operations", []))
+block("Research Required For", profile.get("research_required_for", []))
+print("\n## Boundary\n")
+print("- Verify syntax against target version before execution.")
+print("- Store target-specific facts and citations in the project repo.")
+print("- Do not store raw credentials or default credentials in SACST.")
+PY

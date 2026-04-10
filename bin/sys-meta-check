@@ -31,11 +31,14 @@ require_file canonical/AUTHORIZED_SECURITY_TESTING.md
 require_file meta/TEMPLATE_VERSION.yaml
 require_file meta/PRECEDENCE_MANIFEST.yaml
 require_file meta/REPO_OPERATING_PROFILE.md
+require_file platforms/vendor-profiles/profiles.yaml
 require_file templates/instance/control/TEMPLATE_MANAGED_PATHS.yaml
 require_file bin/sys-fix
 require_file bin/sys-reconcile-project
 require_file bin/sys-research-plan
 require_file bin/sys-platform-plan
+require_file bin/sys-vendor-profile
+require_file bin/sys-secret-check
 require_file bin/sys-scope-check
 require_file bin/sys-validate
 

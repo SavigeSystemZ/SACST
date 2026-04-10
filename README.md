@@ -32,6 +32,8 @@ It is not a live instance repository. SACST stores canonical policy, schemas, te
 - `bin/sys-fix --template|<project-path>`: perform safe mechanical self-healing for template or project contract drift.
 - `bin/sys-research-plan <project-path> --topic <topic>`: create a project-local research note scaffold for vendor, OS, appliance, Windows, Linux, or security-tool command research.
 - `bin/sys-platform-plan <project-path> --vendor <vendor> --device-class <class> --intent <intent>`: create a safe project-local plan for unmodeled vendors, devices, and access methods.
+- `bin/sys-vendor-profile --list|--vendor <profile-key>`: inspect curated safe-start vendor profiles for common infrastructure systems.
+- `bin/sys-secret-check <project-path>`: validate project credential references without printing secret values.
 - `bin/sys-scope-check <project-path> --activity <activity>`: enforce project-local security testing scope before pentest or assessment work.
 - `bin/sys-git-bootstrap <project-path>`: initialize and configure project git defaults and GitHub SSH remote.
 - `bin/sys-remote <project-path> <device> <command>`: run inventory-aware remote operations with backup, validation, probe, and delayed recheck controls.

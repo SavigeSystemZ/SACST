@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1
+
+- Added curated vendor profile catalog and `sys-vendor-profile` for common infrastructure vendors.
+- Added `sys-secret-check` for credential-reference validation without printing secret values.
+- Added opt-in lab-device inspection harness for authorized real-device tests.
+- Fixed raw-audit timestamp selection so `raw-audit/devices/` is not treated as a primary refresh capture.
+
 ## 1.0.0
 
 - Replaced the mixed `framework/` plus in-repo `instances/` model with a root-canonical SACST template.
