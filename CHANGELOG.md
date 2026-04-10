@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- Opted SACST CI into the GitHub Actions Node.js 24 runtime before GitHub's June 2, 2026 default switch.
+
 ## 1.0.1
 
 - Added curated vendor profile catalog and `sys-vendor-profile` for common infrastructure vendors.
