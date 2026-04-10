@@ -19,7 +19,7 @@
 - Optimize for sysadmin, network-admin, and infrastructure workflows.
 - Keep hardware, OS, service, network, and security context explicit.
 - Treat project repos as operational control planes, not software application repos.
-- Treat authorized security assessment as an explicitly scoped sysadmin/security workflow, not an open-ended offensive workflow.
+- Treat authorized security assessment as full-spectrum red/blue/purple sysadmin/security work gated by the operator's current tasking and project scope.
 - Treat vendor default credentials as security findings, not reusable template knowledge or normal operating credentials.
 
 ## Remote Rules

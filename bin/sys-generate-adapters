@@ -30,26 +30,29 @@ This repo is a self-contained SACST-derived project repo for system and network 
 ## Read Order
 
 1. \`AGENTS.md\`
-2. \`control/PROJECT_PROFILE.yaml\`
-3. \`control/MODE_POLICY.yaml\`
-4. \`control/PERMISSIONS_POLICY.yaml\`
-5. \`control/FRESHNESS_POLICY.yaml\`
-6. \`control/RESEARCH_POLICY.yaml\`
-7. \`control/CREDENTIAL_REFERENCES.yaml\`
-8. \`control/SECURITY_SCOPE.yaml\`
-9. \`control/SYSTEM_MAP.md\`
-10. \`context/normalized/HOST_PROFILE.md\`
-11. \`inventory/devices.yaml\`
-12. \`runtime/RUNTIME_STATE.yaml\`
-13. \`context/normalized/devices/<device-name>/\` when the task targets a specific inventory-managed device
+2. \`LOCAL_CONTEXT.md\`
+3. \`control/PROJECT_PROFILE.yaml\`
+4. \`control/MODE_POLICY.yaml\`
+5. \`control/PERMISSIONS_POLICY.yaml\`
+6. \`control/FRESHNESS_POLICY.yaml\`
+7. \`control/RESEARCH_POLICY.yaml\`
+8. \`control/CREDENTIAL_REFERENCES.yaml\`
+9. \`control/SECURITY_SCOPE.yaml\`
+10. \`control/SYSTEM_MAP.md\`
+11. \`context/normalized/HOST_PROFILE.md\`
+12. \`inventory/devices.yaml\`
+13. \`runtime/RUNTIME_STATE.yaml\`
+14. \`control/skills/*/GEMINI.md\`, \`control/skills/*/AGENTS.md\`, or other project-local skill notes when present and relevant
+15. \`context/normalized/devices/<device-name>/\` when the task targets a specific inventory-managed device
 
 ## Rules
 
 - Use normalized context as source of truth unless stale.
+- Load \`LOCAL_CONTEXT.md\` and relevant project-local skill notes before acting on environment-specific preferences.
 - When the task targets a specific inventory device, load that device bundle under \`context/normalized/devices/<device-name>/\` and its runtime state under \`runtime/devices/<device-name>/DEVICE_STATE.yaml\`.
 - Use live research for unfamiliar or version-sensitive vendor, Windows, Linux, appliance, or security-tool syntax when \`control/RESEARCH_POLICY.yaml\` requires it.
 - Store only credential references from \`control/CREDENTIAL_REFERENCES.yaml\`; never store raw secrets in this repo or logs.
-- Treat security testing as defensive-only unless \`control/SECURITY_SCOPE.yaml\` explicitly authorizes the activity and rules of engagement.
+- Treat security testing as full-spectrum red/blue/purple work when the operator's current tasking authorizes it and \`control/SECURITY_SCOPE.yaml\` allows it.
 - Use \`bin/sys-research-plan\` for project-local research notes when command syntax or vendor behavior is uncertain.
 - Use \`bin/sys-platform-plan\` before mutating unmodeled vendors, devices, access methods, or management planes.
 - Use \`bin/sys-scope-check\` or preflight \`--activity\` gates before security testing.
@@ -75,6 +78,7 @@ Load \`AGENTS.md\` first.
 Then load:
 
 - \`control/PROJECT_PROFILE.yaml\`
+- \`LOCAL_CONTEXT.md\`
 - \`control/SYSTEM_MAP.md\`
 - \`control/RESEARCH_POLICY.yaml\`
 - \`control/CREDENTIAL_REFERENCES.yaml\`
@@ -82,6 +86,7 @@ Then load:
 - \`context/normalized/HOST_PROFILE.md\`
 - \`inventory/devices.yaml\`
 - \`runtime/RUNTIME_STATE.yaml\`
+- \`control/skills/*/GEMINI.md\` when project-local skill notes are present and relevant
 
 This project repo is a SACST-derived operational control plane for $PLATFORM.
 EOF
@@ -93,6 +98,7 @@ Start with \`AGENTS.md\`.
 
 This is a SACST-derived sysadmin/network-admin project repo for $PLATFORM.
 Treat project-local truth as authoritative for the managed environment.
+Load \`LOCAL_CONTEXT.md\` and relevant \`control/skills/*\` notes before acting on environment-specific preferences.
 Use project-local research and security scope files before vendor command research or security assessment.
 EOF
 
@@ -139,7 +145,7 @@ globs: ["**/*"]
 - Treat boot, crypto, auth, firewall, routing, and core-service changes as critical actions.
 - Use project preflight, checkpoint, validation, and rollback workflows for risky changes.
 - Do not expose secrets in logs or repo files.
-- Security testing is defensive-only unless `control/SECURITY_SCOPE.yaml` explicitly allows the activity.
+- Security testing is full-spectrum red/blue/purple capable when operator-authorized and allowed by `control/SECURITY_SCOPE.yaml`.
 - Unmodeled vendor/device changes require a project-local platform plan before mutation.
 EOF
 

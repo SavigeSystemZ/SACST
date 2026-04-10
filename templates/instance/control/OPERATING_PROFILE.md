@@ -10,7 +10,7 @@ This project repo is a self-contained operational control plane derived from SAC
 - safe change execution with logging, validation, and rollback
 - inventory-backed multi-device collection and normalized context
 - vendor, OS, appliance, Windows, Linux, and security-tool command research when syntax or compatibility is uncertain
-- authorized defensive security assessment and hardening within explicit project scope
+- full-spectrum red/blue/purple security assessment, validation, defense, hardening, and response within operator-authorized project scope
 
 ## Ground Rules
 
@@ -18,6 +18,6 @@ This project repo is a self-contained operational control plane derived from SAC
 - Use per-device normalized bundles for inventory-managed devices when work targets a specific firewall, switch, or remote node.
 - Use live research for unfamiliar or version-sensitive commands; prefer vendor and primary sources.
 - Store credential references only, never raw secrets.
-- Treat security testing as defensive-only unless the project scope explicitly authorizes more.
+- Treat security testing as full-spectrum red/blue/purple work when it is inside the operator's current tasking and allowed by project scope.
 - Run project-local validation before high-risk work.
 - Respect target-repo local instructions when entering another repo.

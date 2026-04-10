@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+
+- Changed generated security scope posture to operator-gated full-spectrum red/blue/purple operations while retaining prohibitions for unauthorized, out-of-task, uncontrolled, destructive, and secret-disclosure activity.
+
 ## 1.0.3
 
 - Updated SACST CI to the Node.js 24-native `actions/checkout@v6` and `actions/setup-python@v6` action majors.

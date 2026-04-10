@@ -1,19 +1,41 @@
 schema_version: 1
-authorized_security_testing: false
-default_posture: defensive-only
+authorized_security_testing: true
+authorization_model: operator-gated-current-task
+operator_authorization_required: true
+default_posture: operator-gated-full-spectrum
+team_modes:
+  - red_team
+  - blue_team
+  - purple_team
 allowed_activities:
   - inventory
   - exposure_review
   - configuration_review
   - patch_verification
   - hardening
+  - security_review
+  - read_only_assessment
+  - vulnerability_validation
+  - exploit_validation
+  - password_auditing
+  - credential_audit
+  - wireless_testing
+  - web_application_testing
+  - lateral_movement_simulation
+  - controlled_load_testing
+  - red_team_assessment
+  - blue_team_defense
+  - purple_team_validation
+  - detection_engineering
+  - threat_hunting
+  - incident_response
 prohibited_activities:
-  - exploit_validation_without_rules_of_engagement
-  - password_auditing_without_rules_of_engagement
-  - denial_of_service
-  - social_engineering
-  - destructive_testing
-rules_of_engagement_ref: ""
-approval_ref: ""
+  - unauthorized_third_party_targets
+  - action_outside_operator_tasking
+  - uncontrolled_denial_of_service
+  - destructive_testing_without_explicit_confirmation
+  - credential_exfiltration_or_secret_disclosure
+rules_of_engagement_ref: operator-current-task
+approval_ref: operator-current-task
 evidence_handling: redact-sensitive-data
-notes: "Project-specific authorization and rules of engagement belong here, not in SACST."
+notes: "Default project posture is full-spectrum red/blue/purple security operations gated by the operator's current authorized tasking. Narrow this file per project or engagement when needed."

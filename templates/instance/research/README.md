@@ -7,4 +7,4 @@ Rules:
 - Prefer vendor or primary sources.
 - Do not store raw secrets, private configs, or confidential topology dumps.
 - Include date accessed and target platform/version when research affects an operational command.
-- Keep exploit validation details out of this repo unless `control/SECURITY_SCOPE.yaml` explicitly authorizes that work.
+- Keep exploit validation details bounded to the operator-authorized task and `control/SECURITY_SCOPE.yaml`; redact secrets and avoid unnecessary proof material.

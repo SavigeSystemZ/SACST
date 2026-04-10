@@ -63,5 +63,5 @@ When working on SACST itself, start with:
 
 - SACST encodes how agents research unfamiliar or version-sensitive command syntax; project repos store the resulting notes under `research/`.
 - SACST stores credential conventions only. Project repos may store credential references, but raw credentials, tokens, keys, and certificates must remain outside both SACST and normal logs.
-- Security and penetration-testing work is defensive-only by default. Project repos must opt in with `control/SECURITY_SCOPE.yaml`, rules of engagement, and explicit approval references before broader assessment activity.
+- Security and penetration-testing work is full-spectrum red/blue/purple capable by default, gated by the operator's current authorized tasking and `control/SECURITY_SCOPE.yaml`. Narrow a project scope when an engagement requires stricter rules.
 - Unmodeled vendors and devices use `generic-vendor` normalization plus project-local platform plans until a dedicated module is promoted through the learning loop.

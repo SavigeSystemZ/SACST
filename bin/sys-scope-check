@@ -8,7 +8,9 @@ usage() {
 Usage: sys-scope-check <project-path|instance-name> --activity <activity>
 
 Checks whether a security or assessment activity is allowed by the project-local
-control/SECURITY_SCOPE.yaml file. SACST defaults to defensive-only.
+control/SECURITY_SCOPE.yaml file. SACST project scopes default to full-spectrum
+red/blue/purple security operations gated by the operator's current authorized
+tasking.
 EOF
 }
 
@@ -47,6 +49,8 @@ with open(scope_file, "r", encoding="utf-8") as fh:
     scope = yaml.safe_load(fh) or {}
 
 authorized = bool(scope.get("authorized_security_testing", False))
+authorization_model = str(scope.get("authorization_model") or "explicit-roe").strip()
+operator_authorization_required = bool(scope.get("operator_authorization_required", True))
 allowed = {str(item) for item in scope.get("allowed_activities", [])}
 prohibited = {str(item) for item in scope.get("prohibited_activities", [])}
 roe_ref = str(scope.get("rules_of_engagement_ref") or "").strip()
@@ -62,16 +66,18 @@ defensive_default = {
     "read_only_assessment",
 }
 
-roe_required = {
+authorization_required = {
     "exploit_validation",
     "password_auditing",
     "credential_audit",
     "wireless_testing",
     "web_application_testing",
     "lateral_movement_simulation",
-    "denial_of_service",
+    "controlled_load_testing",
     "load_testing",
     "social_engineering",
+    "red_team_assessment",
+    "purple_team_validation",
 }
 
 if activity in prohibited:
@@ -89,10 +95,16 @@ if not authorized:
         f"security activity requires authorized_security_testing=true in control/SECURITY_SCOPE.yaml: {activity}"
     )
 
-if activity in roe_required and (not roe_ref or not approval_ref):
+if activity in authorization_required and (not roe_ref or not approval_ref):
     raise SystemExit(
-        f"security activity requires rules_of_engagement_ref and approval_ref before execution: {activity}"
+        f"security activity requires rules_of_engagement_ref and approval_ref, or operator-current-task placeholders, before execution: {activity}"
     )
 
-print(f"Scope check passed for authorized security activity: {activity}")
+if operator_authorization_required:
+    print(
+        f"Scope check passed for operator-gated security activity: {activity} "
+        f"({authorization_model})"
+    )
+else:
+    print(f"Scope check passed for authorized security activity: {activity}")
 PY

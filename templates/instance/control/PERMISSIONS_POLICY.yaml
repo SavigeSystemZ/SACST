@@ -12,8 +12,8 @@ prohibited_actions:
   - cryptsetup_change_without_explicit_task
   - firewall_change_without_explicit_task
   - unauthorized_security_testing
-  - exploit_validation_without_rules_of_engagement
-  - credential_attack_without_rules_of_engagement
+  - security_activity_outside_operator_tasking
+  - credential_attack_without_explicit_authorization
   - destructive_delete_without_explicit_confirmation
   - factory_reset_without_explicit_confirmation
   - default_credential_use_without_rotation_plan

@@ -24,7 +24,7 @@ SACST is a template and meta-system for sysadmin and network-admin work. It is n
 - Keep the system explicitly optimized for system administration, network administration, and infrastructure operations.
 - Keep live command research as a project-local, source-cited workflow; do not bake transient vendor findings into the template.
 - Never add raw credentials, private keys, tokens, certificates, private configs, or project-specific findings to SACST.
-- Treat security testing as defensive-only unless a project repo explicitly authorizes more through `control/SECURITY_SCOPE.yaml` and rules of engagement.
+- Treat security testing as full-spectrum red/blue/purple work when the operator's current tasking authorizes it and `control/SECURITY_SCOPE.yaml` allows it.
 - When a future task pivots into another repository, target-repo local instructions take precedence.
 
 ## Required Follow-Through

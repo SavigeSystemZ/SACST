@@ -120,9 +120,9 @@ content = f"""# Vendor / Platform Work Plan
 
 ## Security Scope Gate
 
-- Default posture is defensive review and hardening only.
+- Default project posture is full-spectrum red/blue/purple security work gated by the operator's current authorized tasking.
 - Run `bin/sys-scope-check <project> --activity <activity>` before security assessment activity.
-- Broader testing requires `control/SECURITY_SCOPE.yaml` with `authorized_security_testing: true`, `rules_of_engagement_ref`, and `approval_ref`.
+- Narrower engagements should restrict `control/SECURITY_SCOPE.yaml`; ambiguous tasking requires asking the operator before proceeding.
 
 ## Validation and Rollback Gate
 

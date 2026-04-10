@@ -65,7 +65,10 @@
 
 ### SecurityScope
 - `authorized_security_testing`
+- `authorization_model`
+- `operator_authorization_required`
 - `default_posture`
+- `team_modes[]`
 - `allowed_activities[]`
 - `prohibited_activities[]`
 - `rules_of_engagement_ref`

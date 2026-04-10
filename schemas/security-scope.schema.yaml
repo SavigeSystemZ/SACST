@@ -13,9 +13,19 @@ properties:
     const: 1
   authorized_security_testing:
     type: boolean
+  authorization_model:
+    type: string
+    enum: [operator-gated-current-task, explicit-roe, defensive-only]
+  operator_authorization_required:
+    type: boolean
   default_posture:
     type: string
-    enum: [defensive-only, authorized-assessment, authorized-pentest]
+    enum: [defensive-only, authorized-assessment, authorized-pentest, operator-gated-full-spectrum]
+  team_modes:
+    type: array
+    items:
+      type: string
+      enum: [red_team, blue_team, purple_team]
   allowed_activities:
     type: array
     items:

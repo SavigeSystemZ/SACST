@@ -6,7 +6,7 @@ This repository is the canonical SACST template and meta-system.
 
 It defines how AI agents should operate on computers, servers, firewalls, switches, and related infrastructure. It also defines how SACST itself is safely improved over time.
 
-SACST must remain adaptable across vendors and operating systems. It may define live-research workflows for unfamiliar command syntax, Windows/Linux/vendor appliance behavior, generic vendor planning, and authorized security assessment patterns, but project-specific findings and target details belong only in scaffolded project repos.
+SACST must remain adaptable across vendors and operating systems. It may define live-research workflows for unfamiliar command syntax, Windows/Linux/vendor appliance behavior, generic vendor planning, and operator-gated full-spectrum red/blue/purple security assessment patterns, but project-specific findings and target details belong only in scaffolded project repos.
 
 ## Boundary
 

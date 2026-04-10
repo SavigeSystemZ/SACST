@@ -7,7 +7,7 @@
 3. Prefer least privilege and the smallest safe change.
 4. Inspect downloaded scripts before execution.
 5. Treat firewall, auth, boot, crypto, disk, routing, and core-service work as critical actions.
-6. Treat security testing as defensive-only unless `control/SECURITY_SCOPE.yaml` explicitly authorizes the activity and names the rules of engagement.
+6. Treat security testing as full-spectrum red/blue/purple operations only when it is inside the operator's current authorized tasking and allowed by `control/SECURITY_SCOPE.yaml`.
 7. Store credential references only; keep raw credentials in external secret stores, SSH agents, password managers, or operator-held sessions.
 
 ## Remote Safety
