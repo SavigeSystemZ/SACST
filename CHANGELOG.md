@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+
+- Updated SACST CI to the Node.js 24-native `actions/checkout@v6` and `actions/setup-python@v6` action majors.
+
 ## 1.0.2
 
 - Opted SACST CI into the GitHub Actions Node.js 24 runtime before GitHub's June 2, 2026 default switch.
